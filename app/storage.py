@@ -458,7 +458,27 @@ def cleanup_prompt_templates() -> int:
 
 # ===== Article Templates (persist into settings.json) =====
 _BUILTIN_ARTICLE_TYPES = {"url", "note", "review"}
-_ALLOWED_WIDGETS = {"url_context", "kindle", "past_posts"}
+
+# ウィジェットタイプの定義
+WIDGET_TYPES = {
+    "url_context": {
+        "id": "url_context",
+        "name": "URL コンテキスト",
+        "description": "指定したURLの内容を取得して記事作成の参考にします"
+    },
+    "kindle": {
+        "id": "kindle", 
+        "name": "Kindle ハイライト",
+        "description": "Obsidianから取得したKindleハイライトを記事作成の参考にします"
+    },
+    "past_posts": {
+        "id": "past_posts",
+        "name": "過去記事",
+        "description": "過去に書いた記事の内容を参考にして記事を作成します"
+    }
+}
+
+_ALLOWED_WIDGETS = set(WIDGET_TYPES.keys())
 
 
 def _default_article_templates() -> Dict[str, Any]:
@@ -640,3 +660,15 @@ def delete_article_template(t: str) -> bool:
         data["article_templates"] = items
         _atomic_write(SETTINGS_FILE, data)
         return True
+
+
+def get_available_widgets() -> List[Dict[str, str]]:
+    """利用可能なウィジェットタイプの一覧を取得"""
+    return [
+        {
+            "id": widget_info["id"],
+            "name": widget_info["name"],
+            "description": widget_info["description"]
+        }
+        for widget_info in WIDGET_TYPES.values()
+    ]
