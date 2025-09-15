@@ -14,7 +14,15 @@ export default function SettingsPage() {
 	const [saved, setSaved] = useState<string | null>(null)
 	const [hasKey, setHasKey] = useState<boolean | null>(null)
 
+	// Obsidian 設定用のstate
+	const [obsidianDir, setObsidianDir] = useState('')
+	const [obsidianDirInput, setObsidianDirInput] = useState('')
+	const [healthDir, setHealthDir] = useState('')
+	const [healthError, setHealthError] = useState('')
+	const [obsidianSaving, setObsidianSaving] = useState(false)
+
 	useEffect(() => {
+		// AI設定の取得
 		;(async () => {
 			try {
 				const res = await fetch(`${API_BASE}/api/ai/settings`)
@@ -31,6 +39,33 @@ export default function SettingsPage() {
 				if (typeof json.max_prompt_len === 'number')
 					setMaxLen(json.max_prompt_len)
 			} catch {}
+		})()
+
+		// Obsidian設定の取得
+		;(async () => {
+			try {
+				const r = await fetch(`${API_BASE}/api/obsidian/health`)
+				if (!r.ok) {
+					setHealthError(`health取得に失敗 (status ${r.status})`)
+				} else {
+					const j = await r.json()
+					setHealthDir(j?.obsidianDir || '')
+				}
+			} catch {
+				setHealthError('health取得に失敗（ネットワーク）')
+			}
+		})()
+		;(async () => {
+			try {
+				const r = await fetch(`${API_BASE}/api/obsidian/config`)
+				if (r.ok) {
+					const j = await r.json()
+					setObsidianDir(j?.obsidianDir || '')
+					setObsidianDirInput(j?.obsidianDir || '')
+				}
+			} catch {
+				/* noop */
+			}
 		})()
 	}, [])
 
@@ -57,6 +92,29 @@ export default function SettingsPage() {
 				}
 			} catch {}
 		} else setSaved('保存に失敗しました')
+	}
+
+	const saveObsidian = async (path: string | null) => {
+		setObsidianSaving(true)
+		try {
+			const url = path
+				? `${API_BASE}/api/obsidian/config?path=${encodeURIComponent(
+						path
+				  )}`
+				: `${API_BASE}/api/obsidian/config`
+			const r = await fetch(url, { method: 'POST' })
+			if (r.ok) {
+				const j = await r.json()
+				setObsidianDir(j?.effective || '')
+				if (!path) setObsidianDirInput('')
+			} else {
+				alert('設定に失敗しました')
+			}
+		} catch {
+			alert('設定に失敗しました（ネットワーク）')
+		} finally {
+			setObsidianSaving(false)
+		}
 	}
 
 	return (
@@ -146,6 +204,54 @@ export default function SettingsPage() {
 					</span>
 				)}
 			</div>
+
+			<hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+			
+			<h2>Obsidian設定</h2>
+			<p>Obsidianのハイライトディレクトリを設定することで、Kindle Highlightを利用できます。</p>
+			
+			<section
+				style={{
+					margin: '16px 0',
+					padding: 16,
+					border: '1px solid var(--border-color)',
+					borderRadius: '8px',
+					backgroundColor: 'var(--background-secondary)',
+				}}>
+				<label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+					Obsidian ディレクトリ
+				</label>
+				<div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+					<input
+						placeholder="/absolute/path/to/obsidian/kindle_highlight"
+						value={obsidianDirInput}
+						onChange={(e) => setObsidianDirInput(e.target.value)}
+						style={{ flex: 1, padding: 8 }}
+					/>
+					<button
+						onClick={() => saveObsidian(obsidianDirInput.trim() || '')}
+						disabled={obsidianSaving}
+						style={{ padding: '8px 16px' }}>
+						保存
+					</button>
+					<button
+						onClick={() => saveObsidian(null)}
+						disabled={obsidianSaving}
+						style={{ padding: '8px 16px' }}>
+						クリア
+					</button>
+				</div>
+				<div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
+					現在の設定: {obsidianDir || '(未設定)'}
+				</div>
+				<div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+					{healthError ? (
+						<span style={{ color: 'var(--color-error)' }}>{healthError}</span>
+					) : (
+						<span>検出ディレクトリ: {healthDir || '(未検出)'}</span>
+					)}
+				</div>
+			</section>
 
 			<hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
 			
