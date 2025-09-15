@@ -1,29 +1,85 @@
+:root {
+	/* Light theme colors */
+	--bg-color: #fafafa;
+	--text-color: #111;
+	--bg-secondary: #fff;
+	--border-color: #eee;
+	--border-color-hover: #ddd;
+	--sidebar-bg: #111827;
+	--sidebar-text: #e5e7eb;
+	--sidebar-hover: #0b1220;
+	--input-bg: #fff;
+	--input-border: #ccc;
+}
+
+[data-theme='dark'] {
+	/* Dark theme colors */
+	--bg-color: #0f172a;
+	--text-color: #e2e8f0;
+	--bg-secondary: #1e293b;
+	--border-color: #334155;
+	--border-color-hover: #475569;
+	--sidebar-bg: #020617;
+	--sidebar-text: #f1f5f9;
+	--sidebar-hover: #0f172a;
+	--input-bg: #1e293b;
+	--input-border: #475569;
+}
+
 * {
 	box-sizing: border-box;
 }
+
 body {
 	font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
 		sans-serif;
 	line-height: 1.6;
 	margin: 0;
 	padding: 0;
-	background: #fafafa;
-	color: #111;
+	background: var(--bg-color);
+	color: var(--text-color);
+	transition: background-color 0.2s ease, color 0.2s ease;
 }
 button {
 	padding: 8px 12px;
 	margin-top: 8px;
+	background: var(--bg-secondary);
+	color: var(--text-color);
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.2s ease;
 }
+
+button:hover {
+	border-color: var(--border-color-hover);
+	background: var(--bg-color);
+}
+
 input,
 textarea {
 	padding: 8px;
 	margin-top: 8px;
+	background: var(--input-bg);
+	color: var(--text-color);
+	border: 1px solid var(--input-border);
+	border-radius: 4px;
+	transition: all 0.2s ease;
 }
+
+input:focus,
+textarea:focus {
+	outline: none;
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
 section {
-	background: #fff;
-	border: 1px solid #eee;
+	background: var(--bg-secondary);
+	border: 1px solid var(--border-color);
 	border-radius: 8px;
 	padding: 16px;
+	transition: all 0.2s ease;
 }
 
 /* App shell */
@@ -33,10 +89,11 @@ section {
 	min-height: 100vh;
 }
 .sidebar {
-	background: #111827;
-	color: #e5e7eb;
+	background: var(--sidebar-bg);
+	color: var(--sidebar-text);
 	padding: 16px 12px;
-	border-right: 1px solid #0b1220;
+	border-right: 1px solid var(--border-color);
+	transition: all 0.2s ease;
 }
 .brand {
 	font-weight: 700;
@@ -58,7 +115,7 @@ section {
 	border-radius: 8px;
 }
 .nav-item:hover {
-	background: #0b1220;
+	background: var(--sidebar-hover);
 }
 .nav-icon {
 	width: 18px;
