@@ -28,6 +28,21 @@ class Highlight:
     asin: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class ObsidianConfig:
+    root_dir: Path
+    articles_dir: str = "articles"
+    highlights_dir: str = "kindle_highlights"
+    
+    @property
+    def articles_path(self) -> Path:
+        return self.root_dir / self.articles_dir
+    
+    @property
+    def highlights_path(self) -> Path:
+        return self.root_dir / self.highlights_dir
+
+
 def _candidate_obsidian_dirs(base: Path) -> List[Path]:
     cands: List[Path] = [base / "obsidian" / "kindle_highlight"]
     logger.debug("obsidian.candidates=%s", [str(p) for p in cands])
@@ -66,41 +81,117 @@ def _save_settings(data: Dict[str, object]) -> None:
         logger.warning("obsidian.settings_write_failed path=%s err=%r", path, exc)
 
 
-def get_configured_obsidian_dir() -> Optional[Path]:
+def get_configured_obsidian_config() -> Optional[ObsidianConfig]:
+    """新しい設定構造でObsidian設定を取得"""
     cfg = _load_settings()
-    val = cfg.get("obsidian_dir") if isinstance(cfg, dict) else None
-    if isinstance(val, str) and val.strip():
-        p = Path(val).expanduser().resolve()
-        if p.exists() and p.is_dir():
-            return p
-        logger.warning("obsidian.config_invalid path=%s", p)
+    
+    # 新しい設定構造をチェック
+    obsidian_cfg = cfg.get("obsidian")
+    if isinstance(obsidian_cfg, dict):
+        root_dir_val = obsidian_cfg.get("root_dir")
+        if isinstance(root_dir_val, str) and root_dir_val.strip():
+            root_path = Path(root_dir_val).expanduser().resolve()
+            if root_path.exists() and root_path.is_dir():
+                articles_dir = obsidian_cfg.get("articles_dir", "articles")
+                highlights_dir = obsidian_cfg.get("highlights_dir", "kindle_highlights")
+                if isinstance(articles_dir, str) and isinstance(highlights_dir, str):
+                    return ObsidianConfig(
+                        root_dir=root_path,
+                        articles_dir=articles_dir,
+                        highlights_dir=highlights_dir
+                    )
+            logger.warning("obsidian.config_invalid root_dir=%s", root_path)
+    
+    # 旧設定構造をチェック（下位互換性）
+    old_dir = cfg.get("obsidian_dir")
+    if isinstance(old_dir, str) and old_dir.strip():
+        root_path = Path(old_dir).expanduser().resolve()
+        if root_path.exists() and root_path.is_dir():
+            return ObsidianConfig(root_dir=root_path)
+        logger.warning("obsidian.config_invalid obsidian_dir=%s", root_path)
+    
     return None
 
 
-def set_configured_obsidian_dir(path: Optional[str]) -> Optional[Path]:
+def set_configured_obsidian_config(
+    root_dir: Optional[str],
+    articles_dir: str = "articles", 
+    highlights_dir: str = "kindle_highlights"
+) -> Optional[ObsidianConfig]:
+    """新しい設定構造でObsidian設定を保存"""
     cfg = _load_settings()
     if not isinstance(cfg, dict):
         cfg = {}
-    if path and path.strip():
-        p = Path(path).expanduser().resolve()
-        if not (p.exists() and p.is_dir()):
-            raise OSError(f"Invalid directory: {p}")
-        cfg["obsidian_dir"] = str(p)
-        _save_settings(cfg)
-        return p
-    # クリア
-    if "obsidian_dir" in cfg:
+    
+    if root_dir and root_dir.strip():
+        root_path = Path(root_dir).expanduser().resolve()
+        if not (root_path.exists() and root_path.is_dir()):
+            raise OSError(f"Invalid directory: {root_path}")
+        
+        # 新しい設定構造で保存
+        cfg["obsidian"] = {
+            "root_dir": str(root_path),
+            "articles_dir": articles_dir,
+            "highlights_dir": highlights_dir
+        }
+        
+        # 旧設定を削除（クリーンアップ）
         cfg.pop("obsidian_dir", None)
+        
         _save_settings(cfg)
+        return ObsidianConfig(
+            root_dir=root_path,
+            articles_dir=articles_dir,
+            highlights_dir=highlights_dir
+        )
+    
+    # クリア
+    cfg.pop("obsidian", None)
+    cfg.pop("obsidian_dir", None)  # 旧設定もクリア
+    _save_settings(cfg)
     return None
+
+
+
+
+def find_obsidian_highlights_dir() -> Optional[Path]:
+    """Kindleハイライト用ディレクトリを取得"""
+    config = get_configured_obsidian_config()
+    if config:
+        highlights_path = config.highlights_path
+        if highlights_path.exists() and highlights_path.is_dir():
+            return highlights_path
+        logger.warning("obsidian.highlights_dir_not_found path=%s", highlights_path)
+    
+    # フォールバック: 旧形式での探索
+    root = find_obsidian_dir()
+    if root:
+        for candidate in [root / "kindle_highlights", root / "kindle_highlight"]:
+            if candidate.exists() and candidate.is_dir():
+                return candidate
+    
+    return None
+
+
+def find_obsidian_articles_dir() -> Optional[Path]:
+    """過去記事用ディレクトリを取得"""
+    config = get_configured_obsidian_config()
+    if config:
+        articles_path = config.articles_path
+        if articles_path.exists() and articles_path.is_dir():
+            return articles_path
+        logger.warning("obsidian.articles_dir_not_found path=%s", articles_path)
+    
+    # フォールバック: ルートディレクトリを返す
+    return find_obsidian_dir()
 
 
 def find_obsidian_dir(data_dir: Path | None = None) -> Optional[Path]:
     # 設定があれば最優先
-    cfg = get_configured_obsidian_dir()
-    if cfg:
-        logger.info("obsidian.use_config dir=%s", cfg)
-        return cfg
+    config = get_configured_obsidian_config()
+    if config:
+        logger.info("obsidian.use_config dir=%s", config.root_dir)
+        return config.root_dir
     base = (data_dir or Path("./data")).resolve()
     logger.info("obsidian.find base=%s", base)
     for p in _candidate_obsidian_dirs(base):
@@ -270,7 +361,14 @@ def parse_highlights_file(path: Path, root: Path) -> List[Highlight]:
     return parse_highlights_from_text(path, text, root)
 
 
-def collect_highlights(root: Path) -> List[Highlight]:
+def collect_highlights(root: Optional[Path] = None) -> List[Highlight]:
+    """ハイライトを収集（新しいディレクトリ構造対応）"""
+    if root is None:
+        root = find_obsidian_highlights_dir()
+        if not root:
+            logger.warning("obsidian.no_highlights_dir")
+            return []
+    
     items: List[Highlight] = []
     count = 0
     for md in iter_md_files(root):
@@ -280,6 +378,31 @@ def collect_highlights(root: Path) -> List[Highlight]:
             logger.info("obsidian.progress scanned=%d highlights=%d", count, len(items))
     logger.info("obsidian.done scanned=%d highlights=%d", count, len(items))
     return items
+
+
+def collect_articles(root: Optional[Path] = None) -> List[Path]:
+    """過去記事ファイルを収集"""
+    if root is None:
+        root = find_obsidian_articles_dir()
+        if not root:
+            logger.warning("obsidian.no_articles_dir")
+            return []
+    
+    articles: List[Path] = []
+    for md in iter_md_files(root):
+        # ハイライトファイルでないものを記事として扱う
+        try:
+            text = md.read_text(encoding="utf-8", errors="ignore")
+            low = text.lower()
+            # Kindleハイライト系のキーワードがなければ記事とみなす
+            if not ("kindle" in low or "readwise" in low or 
+                   (text.count(">") > len(text.splitlines()) * 0.3)):
+                articles.append(md)
+        except OSError as exc:
+            logger.debug("obsidian.article_check_error file=%s err=%r", md, exc)
+    
+    logger.info("obsidian.articles_found count=%d", len(articles))
+    return articles
 
 
 def list_books_from_highlights(hl: Iterable[Highlight]) -> List[Dict[str, str]]:

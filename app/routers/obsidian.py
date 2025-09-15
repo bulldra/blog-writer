@@ -1,62 +1,101 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from app.obsidian import (
+    collect_articles,
     collect_highlights,
+    find_obsidian_articles_dir,
     find_obsidian_dir,
-    get_configured_obsidian_dir,
+    find_obsidian_highlights_dir,
+    get_configured_obsidian_config,
     list_books_from_highlights,
-    set_configured_obsidian_dir,
+    set_configured_obsidian_config,
 )
 
 router = APIRouter()
 
 
+class ObsidianConfigRequest(BaseModel):
+    root_dir: Optional[str] = None
+    articles_dir: str = "articles"
+    highlights_dir: str = "kindle_highlights"
+
+
 @router.get("/health")
 def health():
     root = find_obsidian_dir()
-    return {"obsidianDir": str(root) if root else None}
+    highlights_dir = find_obsidian_highlights_dir()
+    articles_dir = find_obsidian_articles_dir()
+    return {
+        "obsidianDir": str(root) if root else None,
+        "highlightsDir": str(highlights_dir) if highlights_dir else None,
+        "articlesDir": str(articles_dir) if articles_dir else None,
+    }
 
 
 @router.get("/config")
 def get_config():
-    p = get_configured_obsidian_dir()
-    return {"obsidianDir": str(p) if p else None}
+    config = get_configured_obsidian_config()
+    if config:
+        return {
+            "rootDir": str(config.root_dir),
+            "articlesDir": config.articles_dir,
+            "highlightsDir": config.highlights_dir,
+        }
+    
+    return {"rootDir": None, "articlesDir": None, "highlightsDir": None}
 
 
 @router.post("/config")
-def set_config(
-    path: Optional[str] = Query(
-        None, description="Obsidian ディレクトリの絶対パス。空でクリア"
-    )
-):
+def set_config(config_req: ObsidianConfigRequest):
     try:
-        p = set_configured_obsidian_dir(path)
-    except OSError as exc:  # noqa: BLE001
+        config = set_configured_obsidian_config(
+            config_req.root_dir,
+            config_req.articles_dir,
+            config_req.highlights_dir
+        )
+    except OSError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    root = find_obsidian_dir()
+    
+    # 現在の有効な設定を返す
+    effective_config = get_configured_obsidian_config()
+    highlights_dir = find_obsidian_highlights_dir()
+    articles_dir = find_obsidian_articles_dir()
+    
     return {
-        "configured": str(p) if p else None,
-        "effective": str(root) if root else None,
+        "configured": {
+            "rootDir": str(config.root_dir) if config else None,
+            "articlesDir": config.articles_dir if config else None,
+            "highlightsDir": config.highlights_dir if config else None,
+        } if config else None,
+        "effective": {
+            "rootDir": str(effective_config.root_dir) if effective_config else None,
+            "highlightsDir": str(highlights_dir) if highlights_dir else None,
+            "articlesDir": str(articles_dir) if articles_dir else None,
+        }
     }
+
+
+
 
 
 @router.get("/books")
 def list_books():
-    root = find_obsidian_dir()
-    if not root:
-        raise HTTPException(status_code=404, detail="obsidian dir not found")
-    items = collect_highlights(root)
+    highlights_dir = find_obsidian_highlights_dir()
+    if not highlights_dir:
+        raise HTTPException(status_code=404, detail="obsidian highlights dir not found")
+    items = collect_highlights(highlights_dir)
     return list_books_from_highlights(items)
 
 
 @router.get("/highlights")
 def list_highlights(book: Optional[str] = Query(None)) -> List[dict]:
-    root = find_obsidian_dir()
-    if not root:
-        raise HTTPException(status_code=404, detail="obsidian dir not found")
-    items = collect_highlights(root)
+    highlights_dir = find_obsidian_highlights_dir()
+    if not highlights_dir:
+        raise HTTPException(status_code=404, detail="obsidian highlights dir not found")
+    items = collect_highlights(highlights_dir)
     rows = [
         {
             "id": it.id,
@@ -72,3 +111,22 @@ def list_highlights(book: Optional[str] = Query(None)) -> List[dict]:
         if (not book or it.book == book)
     ]
     return rows
+
+
+@router.get("/articles")
+def list_articles() -> List[dict]:
+    """過去記事一覧を取得"""
+    articles_dir = find_obsidian_articles_dir()
+    if not articles_dir:
+        raise HTTPException(status_code=404, detail="obsidian articles dir not found")
+    
+    articles = collect_articles(articles_dir)
+    return [
+        {
+            "path": str(article),
+            "name": article.stem,
+            "relative_path": str(article.relative_to(articles_dir)) 
+                            if article.is_relative_to(articles_dir) else str(article)
+        }
+        for article in articles
+    ]
