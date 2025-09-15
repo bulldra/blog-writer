@@ -12,7 +12,6 @@
 		"@hello-pangea/dnd": "^18.0.1",
 		"next": "14.2.11",
 		"react": "18.3.1",
-		"react-beautiful-dnd": "^13.1.1",
 		"react-dom": "18.3.1",
 		"react-markdown": "9.0.3",
 		"remark-gfm": "4.0.0",
