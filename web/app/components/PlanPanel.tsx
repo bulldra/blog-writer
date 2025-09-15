@@ -23,8 +23,8 @@ export default function PlanPanel({
 			style={{
 				marginTop: 8,
 				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
+				border: '1px solid var(--border-color)',
+				background: 'var(--bg-secondary)',
 			}}>
 			<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
 				<strong>Plan</strong>
@@ -37,7 +37,7 @@ export default function PlanPanel({
 				<button onClick={() => onClear?.()} style={{ fontSize: 12 }}>
 					クリア
 				</button>
-				<span style={{ fontSize: 12, color: '#666' }}>
+				<span style={{ fontSize: 12, color: 'var(--text-color)' }}>
 					生成時、# PLAN セクションとしてプロンプトに付与（編集不可）
 				</span>
 			</div>

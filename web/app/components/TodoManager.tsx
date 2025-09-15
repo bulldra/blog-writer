@@ -102,7 +102,7 @@ export default function TodoManager({ value, onChange }: Props) {
 									textDecoration: it.done
 										? 'line-through'
 										: 'none',
-									color: it.done ? '#666' : 'inherit',
+									color: it.done ? 'var(--text-color)' : 'inherit',
 								}}
 							/>
 							<div style={{ display: 'flex', gap: 4 }}>

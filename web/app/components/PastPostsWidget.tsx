@@ -20,8 +20,8 @@ export default function PastPostsWidget({
 			style={{
 				marginTop: 8,
 				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
+				border: '1px solid var(--border-color)',
+				background: 'var(--bg-secondary)',
 			}}>
 			<strong>過去記事コンテキスト（任意）</strong>
 			<div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
@@ -37,7 +37,7 @@ export default function PastPostsWidget({
 					))}
 				</select>
 				{selectedPost && (
-					<span style={{ fontSize: 12, color: '#666' }}>
+					<span style={{ fontSize: 12, color: 'var(--text-color)' }}>
 						本文先頭を一部（最大4000文字）参照に送信します
 					</span>
 				)}

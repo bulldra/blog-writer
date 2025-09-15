@@ -33,8 +33,8 @@ export default function KindleHighlightWidget({
 			style={{
 				marginTop: 8,
 				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
+				border: '1px solid var(--border-color)',
+				background: 'var(--bg-secondary)',
 			}}>
 			<strong>Kindle ハイライト（任意）</strong>
 			<div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
@@ -78,7 +78,7 @@ export default function KindleHighlightWidget({
 						{obsidianError}
 					</div>
 				)}
-				<div style={{ fontSize: 12, color: '#666' }}>
+				<div style={{ fontSize: 12, color: 'var(--text-color)' }}>
 					プレビューは最大 {HIGHLIGHT_PREVIEW_LIMIT} 件。
 					{highlights.some((h) => !h.asin) && (
 						<span
@@ -96,9 +96,9 @@ export default function KindleHighlightWidget({
 					style={{
 						maxHeight: 220,
 						overflow: 'auto',
-						border: '1px solid #eee',
+						border: '1px solid var(--border-color)',
 						padding: 6,
-						background: '#fafafa',
+						background: 'var(--bg-color)',
 					}}>
 					<ul
 						style={{

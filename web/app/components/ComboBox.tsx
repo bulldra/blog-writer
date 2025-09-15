@@ -125,8 +125,8 @@ export default function ComboBox({
 						right: 0,
 						maxHeight: 240,
 						overflow: 'auto',
-						background: '#fff',
-						border: '1px solid #ccc',
+						background: 'var(--bg-secondary)',
+						border: '1px solid var(--border-color)',
 						margin: 0,
 						padding: 0,
 						listStyle: 'none',
@@ -139,7 +139,7 @@ export default function ComboBox({
 							onMouseEnter={() => setActive(idx)}
 							style={{
 								padding: '6px 8px',
-								background: idx === active ? '#eef' : '#fff',
+								background: idx === active ? 'var(--bg-color)' : 'var(--bg-secondary)',
 								cursor: 'pointer',
 							}}
 							title={o.value}>
@@ -155,7 +155,7 @@ export default function ComboBox({
 								style={{
 									padding: '6px 8px',
 									cursor: 'pointer',
-									color: '#333',
+									color: 'var(--text-color)',
 								}}>
 								「{input.trim()}」で検索
 							</li>

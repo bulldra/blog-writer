@@ -49,8 +49,8 @@ export default function ResultDisplay({
 			style={{
 				marginTop: 8,
 				padding: 8,
-				border: '1px solid #ddd',
-				background: '#f8f8f8',
+				border: '1px solid var(--border-color)',
+				background: 'var(--bg-secondary)',
 				display: 'grid',
 				gap: 8,
 			}}>
@@ -120,8 +120,8 @@ export default function ResultDisplay({
 					style={{
 						fontSize: 14,
 						lineHeight: 1.6,
-						background: '#fff',
-						border: '1px solid #eee',
+						background: 'var(--bg-secondary)',
+						border: '1px solid var(--border-color)',
 						padding: 12,
 						height: 360,
 						overflowY: 'auto',

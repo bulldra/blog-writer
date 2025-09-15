@@ -71,8 +71,8 @@ export default function ArticleTemplateSelector({
 			style={{
 				marginTop: 8,
 				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
+				border: '1px solid var(--border-color)',
+				background: 'var(--bg-secondary)',
 			}}>
 			<strong>記事テンプレート（任意）</strong>
 			<div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
@@ -93,7 +93,7 @@ export default function ArticleTemplateSelector({
 			{articleTpl && renderFields()}
 			{showUrlWidget && (
 				<div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-					<div style={{ fontSize: 12, color: '#666' }}>
+					<div style={{ fontSize: 12, color: 'var(--text-color)' }}>
 						URL コンテキストを利用します。テンプレートに url
 						プロパティが
 						あればそちらを優先し、未入力時は以下の値を送信します。

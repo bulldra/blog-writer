@@ -14,8 +14,8 @@ export default function TodoSection({ todos, onTodosChange }: TodoSectionProps) 
 			style={{
 				marginTop: 8,
 				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
+				border: '1px solid var(--border-color)',
+				background: 'var(--bg-secondary)',
 			}}>
 			<strong>TODO</strong>
 			<div style={{ marginTop: 6 }}>
@@ -23,7 +23,7 @@ export default function TodoSection({ todos, onTodosChange }: TodoSectionProps) 
 				<div
 					style={{
 						fontSize: 12,
-						color: '#666',
+						color: 'var(--text-color)',
 						marginTop: 4,
 					}}>
 					生成時に TODO を # TODO

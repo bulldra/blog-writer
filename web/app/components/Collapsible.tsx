@@ -63,8 +63,8 @@ export default function Collapsible({
 		<div
 			style={{
 				marginTop: 8,
-				border: '1px dashed #ccc',
-				background: '#fff',
+				border: '1px dashed var(--border-color)',
+				background: 'var(--bg-secondary)',
 				borderRadius: 4,
 			}}>
 			<div
@@ -78,7 +78,7 @@ export default function Collapsible({
 					gap: 8,
 					padding: '8px 10px',
 					cursor: 'pointer',
-					background: '#f7f7f7',
+					background: 'var(--bg-color)',
 					userSelect: 'none',
 				}}>
 				<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -87,7 +87,7 @@ export default function Collapsible({
 					</span>
 				</div>
 				{countLabel && (
-					<div style={{ fontSize: 11, color: '#666' }}>
+					<div style={{ fontSize: 11, color: 'var(--text-color)' }}>
 						{countLabel}
 					</div>
 				)}
@@ -96,12 +96,12 @@ export default function Collapsible({
 				<div
 					style={{
 						padding: '6px 10px 8px 10px',
-						color: '#888',
+						color: 'var(--text-color)',
 						fontSize: 12,
 						fontFamily:
 							'ui-monospace, SFMono-Regular, Menlo, monospace',
-						background: '#fafafa',
-						borderTop: '1px solid #eee',
+						background: 'var(--bg-color)',
+						borderTop: '1px solid var(--border-color)',
 						display: '-webkit-box',
 						WebkitLineClamp: previewLines,
 						WebkitBoxOrient:
@@ -146,7 +146,7 @@ export default function Collapsible({
 								? contentHeight
 								: 240,
 						overflow: 'auto',
-						background: '#fff',
+						background: 'var(--bg-secondary)',
 					}}>
 					{contentAsMarkdown ? (
 						<ReactMarkdown remarkPlugins={[remarkGfm]}>

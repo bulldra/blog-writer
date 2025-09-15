@@ -18,8 +18,8 @@ export default function EditRequest({
 			style={{
 				marginTop: 8,
 				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
+				border: '1px solid var(--border-color)',
+				background: 'var(--bg-secondary)',
 				display: 'grid',
 				gap: 8,
 			}}>
