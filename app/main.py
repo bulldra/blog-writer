@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.routers import ai, dictionary, drafts, phrases, auth
 from app.routers import article_templates as article_templates_router
+from app.routers import epub as epub_router
 from app.routers import generation_history as generation_history_router
 from app.routers import images as images_router
 from app.routers import migrations as migrations_router
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(dictionary.router, prefix="/api/dict", tags=["dictionary"])
     app.include_router(phrases.router, prefix="/api/phrases", tags=["phrases"])
     app.include_router(drafts.router, prefix="/api/drafts", tags=["drafts"])
+    app.include_router(epub_router.router, prefix="/api/epub", tags=["epub"])
     app.include_router(
         obsidian_router.router, prefix="/api/obsidian", tags=["obsidian"]
     )

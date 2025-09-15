@@ -7,6 +7,7 @@ import PropertiesWidget from './PropertiesWidget'
 import KindleHighlightWidget from './KindleHighlightWidget'
 import PastPostsWidget from './PastPostsWidget'
 import GenerationHistoryWidget from './GenerationHistoryWidget'
+import EpubWidget from './EpubWidget'
 
 type WidgetType = {
 	id: string
@@ -167,6 +168,19 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 								)
 							}
 						}}
+					/>
+				)
+			
+			case 'epub':
+				return (
+					<EpubWidget
+						onResultChange={(result) => {
+							// EPUBの検索結果をプロパティに設定
+							if (props.onFieldChange) {
+								props.onFieldChange('epub_context', result)
+							}
+						}}
+						isEnabled={true}
 					/>
 				)
 			
