@@ -6,7 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
 
 logger = logging.getLogger("obsidian")
 
@@ -42,7 +42,14 @@ def _load_settings() -> Dict[str, object]:
     path = _settings_path()
     try:
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                return cast(Dict[str, object], raw)
+            logger.warning(
+                "obsidian.settings_invalid_type path=%s type=%s",
+                path,
+                type(raw).__name__,
+            )
     except Exception as exc:  # noqa: BLE001
         logger.warning("obsidian.settings_read_failed path=%s err=%r", path, exc)
     return {}
