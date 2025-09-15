@@ -16,10 +16,10 @@ def test_get_available_widgets_api():
     widgets = data["widgets"]
     
     assert isinstance(widgets, list)
-    assert len(widgets) == 3
+    assert len(widgets) == 4
     
     widget_ids = [w["id"] for w in widgets]
-    assert set(widget_ids) == {"url_context", "kindle", "past_posts"}
+    assert set(widget_ids) == {"properties", "url_context", "kindle", "past_posts"}
     
     for widget in widgets:
         assert "id" in widget

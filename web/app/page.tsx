@@ -6,8 +6,7 @@ import ArticleTemplateSelector from './components/ArticleTemplateSelector'
 import EditRequest from './components/EditRequest'
 import { type TodoItem } from './components/TodoManager'
 import PlanPanel from './components/PlanPanel'
-import KindleHighlightWidget from './components/KindleHighlightWidget'
-import PastPostsWidget from './components/PastPostsWidget'
+import IntegratedWidgetManager from './components/IntegratedWidgetManager'
 import GenerationControls from './components/GenerationControls'
 import ResultDisplay from './components/ResultDisplay'
 import TodoSection from './components/TodoSection'
@@ -368,6 +367,29 @@ export default function Page() {
 		} finally {
 			setIsStreaming(false)
 			setStreamCtl(null)
+			
+			// 生成が完了したら履歴を保存
+			if (draft && draft.trim()) {
+				try {
+					const title = draft.match(/^#\s*(.+)/m)?.[1] || 'Untitled'
+					const widgetsUsed = articleTplDef?.widgets || []
+					
+					await fetch(`${API_BASE}/api/generation-history`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							title: title.trim(),
+							template_type: articleTpl || 'default',
+							widgets_used: widgetsUsed,
+							properties: articleTplFields,
+							generated_content: draft,
+							reasoning: reasoning,
+						}),
+					})
+				} catch (error) {
+					console.error('Failed to save generation history:', error)
+				}
+			}
 		}
 	}
 
@@ -495,9 +517,6 @@ export default function Page() {
 			setIsEditing(false)
 		}
 	}
-
-	const showKindleWidget = articleTplDef?.widgets?.includes('kindle')
-	const showPastPostsWidget = articleTplDef?.widgets?.includes('past_posts')
 
 	return (
 		<div style={{ margin: '2rem auto', padding: '0 1rem' }}>
@@ -661,44 +680,50 @@ export default function Page() {
 					onStop={stopStreaming}
 				/>
 
-				{/* kindle ハイライト（任意） */}
-				{showKindleWidget && (
-					<KindleHighlightWidget
-						books={obsBooks}
-						bookFilter={bookFilter}
-						selectedBook={selectedBook}
-						highlights={highlights}
-						obsidianError={obsidianError}
-						onBookFilterChange={setBookFilter}
-						onBookSelect={loadHighlights}
-					/>
-				)}
-
-				{/* 過去記事をコンテキストに含める（任意） */}
-				{showPastPostsWidget && (
-					<PastPostsWidget
-						savedPosts={savedPosts}
-						selectedPost={selectedPost}
-						onPostSelect={async (filename) => {
-							setSelectedPost(filename)
-							setSelectedPostContent('')
-							if (!filename) return
-							try {
-								const res = await fetch(
-									`${API_BASE}/api/drafts/posts/${encodeURIComponent(
-										filename
-									)}`
+				{/* 統合ウィジェットマネージャー */}
+				<IntegratedWidgetManager
+					articleTplDef={articleTplDef}
+					articleTplFields={articleTplFields}
+					onFieldChange={(key, value) =>
+						setArticleTplFields((prev) => ({
+							...prev,
+							[key]: value,
+						}))
+					}
+					urlCtx={urlCtx}
+					onChangeUrlCtx={setUrlCtx}
+					obsBooks={obsBooks}
+					bookFilter={bookFilter}
+					selectedBook={selectedBook}
+					highlights={highlights}
+					obsidianError={obsidianError}
+					onBookFilterChange={setBookFilter}
+					onBookSelect={loadHighlights}
+					savedPosts={savedPosts}
+					selectedPost={selectedPost}
+					onPostSelect={async (filename) => {
+						setSelectedPost(filename)
+						setSelectedPostContent('')
+						if (!filename) return
+						try {
+							const res = await fetch(
+								`${API_BASE}/api/drafts/posts/${encodeURIComponent(
+									filename
+								)}`
+							)
+							if (res.ok) {
+								const json = await res.json()
+								setSelectedPostContent(
+									String(json.content || '')
 								)
-								if (res.ok) {
-									const json = await res.json()
-									setSelectedPostContent(
-										String(json.content || '')
-									)
-								}
-							} catch {}
-						}}
-					/>
-				)}
+							}
+						} catch {}
+					}}
+					onGenerationComplete={(title, content, reasoning) => {
+						setDraft(content)
+						setReasoning(reasoning)
+					}}
+				/>
 
 				{/* prompt（折りたたみ） */}
 				{promptPreview && (
