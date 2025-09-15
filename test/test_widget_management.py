@@ -12,7 +12,7 @@ def test_widget_types_defined():
     """ウィジェットタイプが正しく定義されていることを確認"""
     expected_widgets = {"properties", "url_context", "kindle", "past_posts"}
     assert set(WIDGET_TYPES.keys()) == expected_widgets
-    
+
     for widget_id, widget_info in WIDGET_TYPES.items():
         assert widget_info["id"] == widget_id
         assert isinstance(widget_info["name"], str)
@@ -26,10 +26,10 @@ def test_get_available_widgets():
     widgets = get_available_widgets()
     assert isinstance(widgets, list)
     assert len(widgets) == 4
-    
+
     widget_ids = [w["id"] for w in widgets]
     assert set(widget_ids) == {"properties", "url_context", "kindle", "past_posts"}
-    
+
     for widget in widgets:
         assert "id" in widget
         assert "name" in widget
@@ -46,11 +46,11 @@ def test_save_template_with_widgets():
         "prompt_template": "{{title}}について書いてください",
         "widgets": ["url_context", "kindle"],
     }
-    
+
     result = save_article_template("test_widget", payload)
     assert result is not None
     assert result["widgets"] == ["url_context", "kindle"]
-    
+
     # 保存されたテンプレートを取得して確認
     saved = get_article_template("test_widget")
     assert saved is not None
@@ -67,7 +67,7 @@ def test_save_template_with_invalid_widgets():
         "prompt_template": "{{title}}について書いてください",
         "widgets": ["url_context", "invalid_widget", "kindle"],
     }
-    
+
     result = save_article_template("test_invalid_widget", payload)
     assert result is not None
     # 無効なウィジェットは除外される
@@ -84,7 +84,7 @@ def test_save_template_with_duplicate_widgets():
         "prompt_template": "{{title}}について書いてください",
         "widgets": ["url_context", "kindle", "url_context"],
     }
-    
+
     result = save_article_template("test_duplicate_widget", payload)
     assert result is not None
     # 重複は除去される
@@ -101,11 +101,11 @@ def test_save_template_widget_order_preserved():
         "prompt_template": "{{title}}について書いてください",
         "widgets": ["past_posts", "url_context", "kindle"],
     }
-    
+
     result = save_article_template("test_widget_order", payload)
     assert result is not None
     assert result["widgets"] == ["past_posts", "url_context", "kindle"]
-    
+
     # 保存されたテンプレートを取得して順序確認
     saved = get_article_template("test_widget_order")
     assert saved is not None
@@ -122,11 +122,11 @@ def test_template_without_widgets():
         "prompt_template": "{{title}}について書いてください",
         "widgets": [],
     }
-    
+
     result = save_article_template("test_no_widget", payload)
     assert result is not None
     assert result["widgets"] == []
-    
+
     # ウィジェットプロパティがない場合
     payload_no_widgets = {
         "name": "ウィジェットプロパティなしテスト",
@@ -135,7 +135,7 @@ def test_template_without_widgets():
         ],
         "prompt_template": "{{title}}について書いてください",
     }
-    
+
     result = save_article_template("test_no_widget_prop", payload_no_widgets)
     assert result is not None
     assert result["widgets"] == []

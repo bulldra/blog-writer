@@ -467,23 +467,23 @@ WIDGET_TYPES = {
     "properties": {
         "id": "properties",
         "name": "プロパティセット",
-        "description": "記事のメタデータやカスタムフィールドを設定します"
+        "description": "記事のメタデータやカスタムフィールドを設定します",
     },
     "url_context": {
         "id": "url_context",
         "name": "URL コンテキスト",
-        "description": "指定したURLの内容を取得して記事作成の参考にします"
+        "description": "指定したURLの内容を取得して記事作成の参考にします",
     },
     "kindle": {
-        "id": "kindle", 
+        "id": "kindle",
         "name": "Kindle ハイライト",
-        "description": "Obsidianから取得したKindleハイライトを記事作成の参考にします"
+        "description": "Obsidianから取得したKindleハイライトを記事作成の参考にします",
     },
     "past_posts": {
         "id": "past_posts",
         "name": "過去記事",
-        "description": "過去に書いた記事の内容を参考にして記事を作成します"
-    }
+        "description": "過去に書いた記事の内容を参考にして記事を作成します",
+    },
 }
 
 _ALLOWED_WIDGETS = set(WIDGET_TYPES.keys())
@@ -676,7 +676,7 @@ def get_available_widgets() -> List[Dict[str, str]]:
         {
             "id": widget_info["id"],
             "name": widget_info["name"],
-            "description": widget_info["description"]
+            "description": widget_info["description"],
         }
         for widget_info in WIDGET_TYPES.values()
     ]
@@ -689,14 +689,14 @@ def save_generation_history(
     widgets_used: List[str],
     properties: Dict[str, str],
     generated_content: str,
-    reasoning: str = ""
+    reasoning: str = "",
 ) -> Dict[str, Any]:
     """生成履歴を保存する"""
     with _lock:
         data = _read_json(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
         next_id = int(data.get("next_id", 1))
         now = _now_iso()
-        
+
         history_item = {
             "id": next_id,
             "title": title,
@@ -707,14 +707,14 @@ def save_generation_history(
             "reasoning": reasoning,
             "created_at": now,
         }
-        
+
         items = list(data.get("items", []))
         items.append(history_item)
-        
+
         # 最新100件まで保持
         if len(items) > 100:
             items = items[-100:]
-        
+
         _atomic_write(GENERATION_HISTORY_FILE, {"next_id": next_id + 1, "items": items})
         return history_item
 
@@ -725,19 +725,21 @@ def list_generation_history(limit: int = 20) -> List[Dict[str, Any]]:
         data = _read_json(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
         items = data.get("items", [])
         assert isinstance(items, list)
-        
+
         result = []
         for item in items:
-            result.append({
-                "id": int(item["id"]),
-                "title": str(item.get("title", "")),
-                "template_type": str(item.get("template_type", "")),
-                "widgets_used": list(item.get("widgets_used", [])),
-                "properties": dict(item.get("properties", {})),
-                "created_at": str(item.get("created_at", _now_iso())),
-                "content_length": len(str(item.get("generated_content", ""))),
-            })
-        
+            result.append(
+                {
+                    "id": int(item["id"]),
+                    "title": str(item.get("title", "")),
+                    "template_type": str(item.get("template_type", "")),
+                    "widgets_used": list(item.get("widgets_used", [])),
+                    "properties": dict(item.get("properties", {})),
+                    "created_at": str(item.get("created_at", _now_iso())),
+                    "content_length": len(str(item.get("generated_content", ""))),
+                }
+            )
+
         return sorted(result, key=lambda d: d["created_at"], reverse=True)[:limit]
 
 

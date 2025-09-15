@@ -11,6 +11,9 @@ dependencies = [
 	"google-genai>=0.3.0",
 	"cryptography>=43.0.1",
 	"pytest>=8.3.0",
+	"python-jose[cryptography]>=3.3.0",
+	"authlib>=1.2.0",
+	"itsdangerous>=2.1.0",
 ]
 
 [tool.uv]
@@ -34,6 +37,16 @@ module = [
 	"google.genai",
 	"cryptography",
 	"cryptography.fernet",
+	"authlib",
+	"authlib.integrations.starlette_client",
+	"jose",
 ]
 ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "mypy>=1.18.1",
+    "ruff>=0.13.0",
+]
 
