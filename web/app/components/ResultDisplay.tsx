@@ -45,62 +45,39 @@ export default function ResultDisplay({
 	const textRef = useRef<HTMLTextAreaElement | null>(null)
 
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				padding: 8,
-				border: '1px solid var(--border-color)',
-				background: 'var(--bg-secondary)',
-				display: 'grid',
-				gap: 8,
-			}}>
-			<div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-				<label
-					style={{
-						display: 'flex',
-						alignItems: 'center',
-						gap: 4,
-					}}>
+		<div className="result-container">
+			<div className="result-controls">
+				<label className="result-checkbox-label">
 					<input
 						type="checkbox"
 						checked={resultEditable}
 						onChange={(e) => onResultEditableChange(e.target.checked)}
 					/>
-					<span style={{ fontSize: 12 }}>編集モード</span>
+					<span className="text-xs">編集モード</span>
 				</label>
-				<label
-					style={{
-						display: 'flex',
-						alignItems: 'center',
-						gap: 4,
-					}}>
+				<label className="result-checkbox-label">
 					<input
 						type="checkbox"
 						checked={showPreview}
 						onChange={(e) => onShowPreviewChange(e.target.checked)}
 					/>
-					<span style={{ fontSize: 12 }}>プレビュー表示</span>
+					<span className="text-xs">プレビュー表示</span>
 				</label>
-				<button onClick={onCopy} style={{ fontSize: 12 }}>
+				<button onClick={onCopy} className="text-xs">
 					コピー
 				</button>
-				<button onClick={onSave} style={{ fontSize: 12 }}>
+				<button onClick={onSave} className="text-xs">
 					保存
 				</button>
-				<label
-					style={{
-						display: 'flex',
-						alignItems: 'center',
-						gap: 6,
-					}}>
+				<label className="result-checkbox-label">
 					<input
 						type="checkbox"
 						checked={commitWithGit}
 						onChange={(e) => onCommitWithGitChange(e.target.checked)}
 					/>
-					<span style={{ fontSize: 12 }}>Gitでコミット</span>
+					<span className="text-xs">Gitでコミット</span>
 				</label>
-				<a href="/drafts" style={{ textDecoration: 'none' }}>
+				<a href="/drafts" className="result-drafts-link">
 					🗂️ 保存一覧
 				</a>
 			</div>
@@ -117,15 +94,7 @@ export default function ResultDisplay({
 			{showPreview && (
 				<div
 					ref={previewRef}
-					style={{
-						fontSize: 14,
-						lineHeight: 1.6,
-						background: 'var(--bg-secondary)',
-						border: '1px solid var(--border-color)',
-						padding: 12,
-						height: 360,
-						overflowY: 'auto',
-					}}>
+					className="result-preview">
 					<ReactMarkdown remarkPlugins={[remarkGfm]}>
 						{draft || ''}
 					</ReactMarkdown>
@@ -142,17 +111,7 @@ export default function ResultDisplay({
 					value={draft}
 					onChange={(e) => onDraftChange(e.target.value)}
 					disabled={!resultEditable}
-					style={{
-						width: '100%',
-						minHeight: 220,
-						maxHeight: 440,
-						overflow: 'scroll',
-						fontSize: 14,
-						lineHeight: 1.5,
-						fontFamily:
-							'ui-monospace, SFMono-Regular, Menlo, monospace',
-						whiteSpace: 'pre-wrap',
-					}}
+					className="result-textarea"
 				/>
 			</Collapsible>
 		</div>

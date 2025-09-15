@@ -10,22 +10,11 @@ interface TodoSectionProps {
 
 export default function TodoSection({ todos, onTodosChange }: TodoSectionProps) {
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				padding: 8,
-				border: '1px solid var(--border-color)',
-				background: 'var(--bg-secondary)',
-			}}>
+		<div className="component-container">
 			<strong>TODO</strong>
-			<div style={{ marginTop: 6 }}>
+			<div className="mt-6">
 				<TodoManager value={todos} onChange={onTodosChange} />
-				<div
-					style={{
-						fontSize: 12,
-						color: 'var(--text-color)',
-						marginTop: 4,
-					}}>
+				<div className="todo-description">
 					生成時に TODO を # TODO
 					セクションとしてプロンプトに付加します。完了にチェックすると打ち消し線になります。
 				</div>

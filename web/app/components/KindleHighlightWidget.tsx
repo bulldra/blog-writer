@@ -29,31 +29,20 @@ export default function KindleHighlightWidget({
 	const visibleHighlights = highlights.slice(0, HIGHLIGHT_PREVIEW_LIMIT)
 
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				padding: 8,
-				border: '1px solid var(--border-color)',
-				background: 'var(--bg-secondary)',
-			}}>
+		<div className="component-container">
 			<strong>Kindle ハイライト（任意）</strong>
-			<div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
-				<div
-					style={{
-						display: 'flex',
-						gap: 6,
-						alignItems: 'center',
-					}}>
+			<div className="grid-gap-6 mt-6">
+				<div className="flex-row">
 					<input
 						placeholder="書籍名フィルタ"
 						value={bookFilter}
 						onChange={(e) => onBookFilterChange(e.target.value)}
-						style={{ flex: 1 }}
+						className="flex-1"
 					/>
 					<select
 						value={selectedBook}
 						onChange={(e) => onBookSelect(e.target.value)}
-						style={{ flex: 1 }}>
+						className="flex-1">
 						<option value="">（選択しない）</option>
 						{books
 							.filter((b) =>
@@ -69,49 +58,30 @@ export default function KindleHighlightWidget({
 								</option>
 							))}
 					</select>
-					<a href="/obsidian" style={{ textDecoration: 'none' }}>
+					<a href="/obsidian" className="kindle-obsidian-link">
 						📚 Obsidian
 					</a>
 				</div>
 				{obsidianError && (
-					<div style={{ color: '#a00', fontSize: 12 }}>
+					<div className="kindle-error">
 						{obsidianError}
 					</div>
 				)}
-				<div style={{ fontSize: 12, color: 'var(--text-color)' }}>
+				<div className="kindle-preview-info">
 					プレビューは最大 {HIGHLIGHT_PREVIEW_LIMIT} 件。
 					{highlights.some((h) => !h.asin) && (
-						<span
-							style={{
-								color: '#a00',
-								marginLeft: 8,
-							}}>
+						<span className="kindle-asin-warning">
 							一部のハイライトに ASIN
 							がありません。引用記法に ASIN
 							が付与されない場合があります。
 						</span>
 					)}
 				</div>
-				<div
-					style={{
-						maxHeight: 220,
-						overflow: 'auto',
-						border: '1px solid var(--border-color)',
-						padding: 6,
-						background: 'var(--bg-color)',
-					}}>
-					<ul
-						style={{
-							margin: 0,
-							padding: 0,
-							listStyle: 'none',
-						}}>
+				<div className="kindle-highlights-container">
+					<ul className="kindle-highlights-list">
 						{visibleHighlights.map((h) => (
-							<li key={h.id} style={{ padding: '4px 0' }}>
-								<span
-									style={{
-										whiteSpace: 'pre-wrap',
-									}}>
+							<li key={h.id} className="kindle-highlight-item">
+								<span className="kindle-highlight-text">
 									{h.text}
 								</span>
 							</li>

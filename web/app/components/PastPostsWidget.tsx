@@ -16,19 +16,13 @@ export default function PastPostsWidget({
 	onPostSelect,
 }: PastPostsWidgetProps) {
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				padding: 8,
-				border: '1px solid var(--border-color)',
-				background: 'var(--bg-secondary)',
-			}}>
+		<div className="component-container">
 			<strong>過去記事コンテキスト（任意）</strong>
-			<div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+			<div className="flex-row mt-6">
 				<select
 					value={selectedPost}
 					onChange={(e) => onPostSelect(e.target.value)}
-					style={{ flex: 1 }}>
+					className="flex-1">
 					<option value="">（選択しない）</option>
 					{savedPosts.map((p) => (
 						<option key={p.filename} value={p.filename}>
@@ -37,7 +31,7 @@ export default function PastPostsWidget({
 					))}
 				</select>
 				{selectedPost && (
-					<span style={{ fontSize: 12, color: 'var(--text-color)' }}>
+					<span className="text-xs text-secondary">
 						本文先頭を一部（最大4000文字）参照に送信します
 					</span>
 				)}

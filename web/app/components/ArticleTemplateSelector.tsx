@@ -36,10 +36,10 @@ export default function ArticleTemplateSelector({
 	const renderFields = () => {
 		if (!articleTplDef || !articleTplDef.fields?.length) return null
 		return (
-			<div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+			<div className="grid-gap-6 mt-8">
 				{articleTplDef.fields.map((f) => (
-					<div key={f.key} style={{ display: 'grid', gap: 4 }}>
-						<label style={{ fontSize: 12 }}>{f.label}</label>
+					<div key={f.key} className="grid-gap-4">
+						<label className="text-xs">{f.label}</label>
 						{f.input_type === 'textarea' ? (
 							<textarea
 								placeholder={f.key}
@@ -67,53 +67,42 @@ export default function ArticleTemplateSelector({
 	const showUrlWidget = articleTplDef?.widgets?.includes('url_context')
 
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				padding: 8,
-				border: '1px solid var(--border-color)',
-				background: 'var(--bg-secondary)',
-			}}>
+		<div className="component-container">
 			<strong>記事テンプレート（任意）</strong>
-			<div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+			<div className="flex-row mt-6">
 				<select
 					value={articleTpl}
 					onChange={(e) => onChangeArticleTpl(e.target.value)}
-					style={{ width: 260 }}>
+					className="select-width">
 					{articleTplList.map((t) => (
 						<option key={t.type} value={t.type}>
 							{t.name} ({t.type})
 						</option>
 					))}
 				</select>
-				<a href="/templates" style={{ fontSize: 12 }}>
+				<a href="/templates" className="text-xs">
 					⚙︎ 管理
 				</a>
 			</div>
 			{articleTpl && renderFields()}
 			{showUrlWidget && (
-				<div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
-					<div style={{ fontSize: 12, color: 'var(--text-color)' }}>
+				<div className="mt-8 grid-gap-6">
+					<div className="text-xs text-secondary">
 						URL コンテキストを利用します。テンプレートに url
 						プロパティが
 						あればそちらを優先し、未入力時は以下の値を送信します。
 					</div>
-					<div
-						style={{
-							display: 'flex',
-							gap: 6,
-							alignItems: 'center',
-						}}>
+					<div className="flex-row">
 						<input
 							placeholder="https://example.com/...（未指定可）"
 							value={urlCtx}
 							onChange={(e) => onChangeUrlCtx(e.target.value)}
-							style={{ flex: 1 }}
+							className="flex-1"
 						/>
 						{urlCtx && (
 							<button
 								onClick={() => onChangeUrlCtx('')}
-								style={{ fontSize: 12 }}>
+								className="text-xs">
 								クリア
 							</button>
 						)}

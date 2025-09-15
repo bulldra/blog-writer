@@ -60,54 +60,31 @@ export default function Collapsible({
 		} catch {}
 	}, [open])
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				border: '1px dashed var(--border-color)',
-				background: 'var(--bg-secondary)',
-				borderRadius: 4,
-			}}>
+		<div className="collapsible-wrapper">
 			<div
 				role="button"
 				id={btnId}
 				onClick={() => setOpen((v) => !v)}
-				style={{
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'space-between',
-					gap: 8,
-					padding: '8px 10px',
-					cursor: 'pointer',
-					background: 'var(--bg-color)',
-					userSelect: 'none',
-				}}>
-				<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-					<span style={{ fontSize: 12 }}>
+				className="collapsible-header">
+				<div className="collapsible-title">
+					<span className="text-xs">
 						{open ? '▼' : '▶︎'} {title}
 					</span>
 				</div>
 				{countLabel && (
-					<div style={{ fontSize: 11, color: 'var(--text-color)' }}>
+					<div className="collapsible-count">
 						{countLabel}
 					</div>
 				)}
 			</div>
 			{!open && previewText && previewText.trim() && (
 				<div
+					className="collapsible-preview"
 					style={{
-						padding: '6px 10px 8px 10px',
-						color: 'var(--text-color)',
-						fontSize: 12,
-						fontFamily:
-							'ui-monospace, SFMono-Regular, Menlo, monospace',
-						background: 'var(--bg-color)',
-						borderTop: '1px solid var(--border-color)',
 						display: '-webkit-box',
 						WebkitLineClamp: previewLines,
 						WebkitBoxOrient:
 							'vertical' as React.CSSProperties['WebkitBoxOrient'],
-						overflow: 'hidden',
-						whiteSpace: 'pre-wrap',
 						height:
 							typeof previewHeight === 'number'
 								? previewHeight
@@ -135,18 +112,12 @@ export default function Collapsible({
 			{open && (
 				<div
 					ref={setRefs}
+					className="collapsible-content-expanded"
 					style={{
-						padding: 8,
-						whiteSpace: 'pre-wrap',
-						fontSize: 12,
-						fontFamily:
-							'ui-monospace, SFMono-Regular, Menlo, monospace',
 						height:
 							typeof contentHeight === 'number'
 								? contentHeight
 								: 240,
-						overflow: 'auto',
-						background: 'var(--bg-secondary)',
 					}}>
 					{contentAsMarkdown ? (
 						<ReactMarkdown remarkPlugins={[remarkGfm]}>
