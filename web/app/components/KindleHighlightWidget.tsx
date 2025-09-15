@@ -58,8 +58,8 @@ export default function KindleHighlightWidget({
 								</option>
 							))}
 					</select>
-					<a href="/obsidian" className="kindle-obsidian-link">
-						📚 Obsidian
+					<a href="/settings" style={{ textDecoration: 'none' }}>
+						⚙️ 設定
 					</a>
 				</div>
 				{obsidianError && (
