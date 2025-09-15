@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import ComboBox from '../components/ComboBox'
+import ThemeToggle from '../components/ThemeToggle'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
 
@@ -145,6 +146,12 @@ export default function SettingsPage() {
 					</span>
 				)}
 			</div>
+
+			<hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+			
+			<h2>テーマ設定</h2>
+			<p>アプリケーションの表示テーマを切り替えることができます。</p>
+			<ThemeToggle />
 		</main>
 	)
 }
