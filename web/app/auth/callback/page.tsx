@@ -1,5 +1,5 @@
-import AuthCallback from "@/app/components/auth/AuthCallback";
+import AuthCallback from '../../components/auth/AuthCallback'
 
 export default function CallbackPage() {
-  return <AuthCallback />;
+	return <AuthCallback />
 }

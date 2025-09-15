@@ -17,11 +17,12 @@ def test_theme_toggle_component_exists():
     # コンポーネントファイルが存在することを確認
     import os
 
-    theme_provider_path = (
-        "/home/runner/work/blog-writer/blog-writer/web/app/components/ThemeProvider.tsx"
+    base = os.getenv("GITHUB_WORKSPACE", ".")
+    theme_provider_path = os.path.join(
+        base, "web", "app", "components", "ThemeProvider.tsx"
     )
-    theme_toggle_path = (
-        "/home/runner/work/blog-writer/blog-writer/web/app/components/ThemeToggle.tsx"
+    theme_toggle_path = os.path.join(
+        base, "web", "app", "components", "ThemeToggle.tsx"
     )
 
     assert os.path.exists(
@@ -34,7 +35,9 @@ def test_css_variables_defined():
     """CSS変数が正しく定義されていることをテスト"""
     import os
 
-    css_path = "/home/runner/work/blog-writer/blog-writer/web/app/globals.css"
+    css_path = os.path.join(
+        os.getenv("GITHUB_WORKSPACE", "."), "web", "app", "globals.css"
+    )
 
     assert os.path.exists(css_path), "globals.css が存在しません"
 
@@ -55,7 +58,9 @@ def test_layout_includes_theme_provider():
     """レイアウトファイルにThemeProviderが含まれていることをテスト"""
     import os
 
-    layout_path = "/home/runner/work/blog-writer/blog-writer/web/app/layout.tsx"
+    layout_path = os.path.join(
+        os.getenv("GITHUB_WORKSPACE", "."), "web", "app", "layout.tsx"
+    )
 
     assert os.path.exists(layout_path), "layout.tsx が存在しません"
 
@@ -74,8 +79,8 @@ def test_settings_page_includes_theme_toggle():
     """設定ページにテーマトグルが含まれていることをテスト"""
     import os
 
-    settings_path = (
-        "/home/runner/work/blog-writer/blog-writer/web/app/settings/page.tsx"
+    settings_path = os.path.join(
+        os.getenv("GITHUB_WORKSPACE", "."), "web", "app", "settings", "page.tsx"
     )
 
     assert os.path.exists(settings_path), "settings/page.tsx が存在しません"

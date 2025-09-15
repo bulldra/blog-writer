@@ -50,7 +50,8 @@ def _candidate_obsidian_dirs(base: Path) -> List[Path]:
 
 
 def _settings_path() -> Path:
-    return (Path("./data") / "settings.json").resolve()
+    # 相対→絶対への解決のみ行い、realpath 変換はしない
+    return Path("./data").absolute() / "settings.json"
 
 
 def _load_settings() -> Dict[str, object]:
@@ -90,7 +91,8 @@ def get_configured_obsidian_config() -> Optional[ObsidianConfig]:
     if isinstance(obsidian_cfg, dict):
         root_dir_val = obsidian_cfg.get("root_dir")
         if isinstance(root_dir_val, str) and root_dir_val.strip():
-            root_path = Path(root_dir_val).expanduser().resolve()
+            # realpath にせず、テストの期待に合わせて文字列そのままを尊重
+            root_path = Path(root_dir_val).expanduser()
             if root_path.exists() and root_path.is_dir():
                 articles_dir = obsidian_cfg.get("articles_dir", "articles")
                 highlights_dir = obsidian_cfg.get("highlights_dir", "kindle_highlights")
@@ -105,7 +107,7 @@ def get_configured_obsidian_config() -> Optional[ObsidianConfig]:
     # 旧設定構造をチェック（下位互換性）
     old_dir = cfg.get("obsidian_dir")
     if isinstance(old_dir, str) and old_dir.strip():
-        root_path = Path(old_dir).expanduser().resolve()
+        root_path = Path(old_dir).expanduser()
         if root_path.exists() and root_path.is_dir():
             return ObsidianConfig(root_dir=root_path)
         logger.warning("obsidian.config_invalid obsidian_dir=%s", root_path)
@@ -124,7 +126,7 @@ def set_configured_obsidian_config(
         cfg = {}
 
     if root_dir and root_dir.strip():
-        root_path = Path(root_dir).expanduser().resolve()
+        root_path = Path(root_dir).expanduser()
         if not (root_path.exists() and root_path.is_dir()):
             raise OSError(f"Invalid directory: {root_path}")
 
@@ -187,15 +189,15 @@ def find_obsidian_dir(data_dir: Path | None = None) -> Optional[Path]:
     config = get_configured_obsidian_config()
     if config:
         logger.info("obsidian.use_config dir=%s", config.root_dir)
+        # 入力のパス表現をそのまま返す
         return config.root_dir
-    base = (data_dir or Path("./data")).resolve()
+    base = (data_dir or Path("./data")).absolute()
     logger.info("obsidian.find base=%s", base)
     for p in _candidate_obsidian_dirs(base):
         try:
             if p.exists() and p.is_dir():
-                found = p.resolve()
-                logger.info("obsidian.found dir=%s", found)
-                return found
+                logger.info("obsidian.found dir=%s", p)
+                return p
         except OSError as exc:
             logger.debug("obsidian.check_error dir=%s err=%r", p, exc)
             continue

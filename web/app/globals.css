@@ -573,3 +573,74 @@ section {
 	overflow-x: auto;
 	margin-bottom: 12px;
 }
+
+/* DnD widgets */
+.dnd-hint {
+	font-size: 12px;
+	color: var(--text-color);
+	opacity: 0.7;
+	margin-left: 6px;
+}
+
+.dnd-list {
+	display: grid;
+	gap: 6px;
+	padding: 4px;
+	border-radius: 6px;
+}
+
+.dnd-list.drag-over {
+	background: var(--bg-color);
+	outline: 2px dashed var(--border-color-hover);
+	outline-offset: -4px;
+}
+
+.dnd-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border: 1px solid var(--border-color);
+	background: var(--bg-secondary);
+	border-radius: 8px;
+	transition: box-shadow 0.12s ease, background 0.12s ease,
+		border-color 0.12s ease, transform 0.12s ease;
+}
+
+.dnd-item:hover {
+	border-color: var(--border-color-hover);
+	box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.dnd-item.dragging {
+	background: #eef5ff;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+	transform: rotate(0.001deg);
+}
+
+.dnd-item-main {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+}
+
+.dnd-handle {
+	width: 18px;
+	height: 18px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: grab;
+	user-select: none;
+	color: var(--text-color);
+	opacity: 0.7;
+}
+
+.dnd-item.dragging .dnd-handle {
+	cursor: grabbing;
+}
+
+.dnd-handle:hover {
+	opacity: 1;
+}

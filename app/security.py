@@ -2,12 +2,12 @@ import base64
 import hashlib
 import ipaddress
 import socket
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 
@@ -82,7 +82,7 @@ def get_current_user(
         import os
 
         secret_key = os.getenv("SECRET_KEY", "your-secret-key-here")
-        payload = jwt.decode(token, secret_key, algorithms=["HS256"])
+        payload: Dict[str, Any] = jwt.decode(token, secret_key, algorithms=["HS256"])
         return payload
     except JWTError:
         raise HTTPException(

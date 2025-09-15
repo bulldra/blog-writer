@@ -84,8 +84,15 @@ def set_config(config_req: ObsidianConfigRequest):
 def list_books():
     highlights_dir = find_obsidian_highlights_dir()
     if not highlights_dir:
-        raise HTTPException(status_code=404, detail="obsidian highlights dir not found")
-    items = collect_highlights(highlights_dir)
+        root = find_obsidian_dir()
+        if not root:
+            raise HTTPException(
+                status_code=404,
+                detail="obsidian dir not found; highlights dir not found",
+            )
+        items = collect_highlights()
+    else:
+        items = collect_highlights(highlights_dir)
     return list_books_from_highlights(items)
 
 
@@ -93,8 +100,15 @@ def list_books():
 def list_highlights(book: Optional[str] = Query(None)) -> List[dict]:
     highlights_dir = find_obsidian_highlights_dir()
     if not highlights_dir:
-        raise HTTPException(status_code=404, detail="obsidian highlights dir not found")
-    items = collect_highlights(highlights_dir)
+        root = find_obsidian_dir()
+        if not root:
+            raise HTTPException(
+                status_code=404,
+                detail="obsidian dir not found; highlights dir not found",
+            )
+        items = collect_highlights()
+    else:
+        items = collect_highlights(highlights_dir)
     rows = [
         {
             "id": it.id,

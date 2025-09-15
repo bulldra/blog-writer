@@ -726,7 +726,7 @@ def list_generation_history(limit: int = 20) -> List[Dict[str, Any]]:
         items = data.get("items", [])
         assert isinstance(items, list)
 
-        result = []
+        result: List[Dict[str, Any]] = []
         for item in items:
             result.append(
                 {
@@ -740,7 +740,7 @@ def list_generation_history(limit: int = 20) -> List[Dict[str, Any]]:
                 }
             )
 
-        return sorted(result, key=lambda d: d["created_at"], reverse=True)[:limit]
+        return sorted(result, key=lambda d: str(d["created_at"]), reverse=True)[:limit]
 
 
 def get_generation_history(history_id: int) -> Optional[Dict[str, Any]]:
