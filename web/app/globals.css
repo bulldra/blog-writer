@@ -125,6 +125,12 @@ section {
 	font-size: 14px;
 }
 
+.sidebar-footer {
+	margin-top: auto;
+	padding-top: 16px;
+	border-top: 1px solid var(--border-color);
+}
+
 .content {
 	padding: 20px;
 }
