@@ -1,16 +1,18 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import Collapsible from './components/Collapsible'
 import ArticleTemplateSelector from './components/ArticleTemplateSelector'
 import EditRequest from './components/EditRequest'
-import TodoManager, { type TodoItem } from './components/TodoManager'
+import { type TodoItem } from './components/TodoManager'
 import PlanPanel from './components/PlanPanel'
+import KindleHighlightWidget from './components/KindleHighlightWidget'
+import PastPostsWidget from './components/PastPostsWidget'
+import GenerationControls from './components/GenerationControls'
+import ResultDisplay from './components/ResultDisplay'
+import TodoSection from './components/TodoSection'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
-const HIGHLIGHT_PREVIEW_LIMIT = 200
 
 type TemplateField = {
 	key: string
@@ -66,8 +68,6 @@ export default function Page() {
 	const [streamCtl, setStreamCtl] = useState<AbortController | null>(null)
 	const inReasoningRef = useRef(false)
 	const sawOutputMarkerRef = useRef(false)
-	const previewRef = useRef<HTMLDivElement | null>(null)
-	const textRef = useRef<HTMLTextAreaElement | null>(null)
 	const reasoningRef = useRef<HTMLDivElement | null>(null)
 
 	// 画像
@@ -187,11 +187,6 @@ export default function Page() {
 			if (res.ok) setHighlights(await res.json())
 		} catch {}
 	}
-
-	const visibleHighlights = useMemo(
-		() => highlights.slice(0, HIGHLIGHT_PREVIEW_LIMIT),
-		[highlights]
-	)
 
 	// 記事テンプレのフィールド（プロパティ）を Markdown として整形
 	const buildPropertiesAppend = () => {
@@ -391,24 +386,9 @@ export default function Page() {
 		streamCtl?.abort()
 	}
 
-	// 自動スクロール
+	// 自動スクロール（reasoning のみ）
 	useEffect(() => {
 		if (!isStreaming) return
-		if (showPreview && previewRef.current) {
-			requestAnimationFrame(() => {
-				try {
-					previewRef.current!.scrollTop =
-						previewRef.current!.scrollHeight
-				} catch {}
-			})
-		}
-		if (resultEditable && textRef.current) {
-			requestAnimationFrame(() => {
-				try {
-					textRef.current!.scrollTop = textRef.current!.scrollHeight
-				} catch {}
-			})
-		}
 		const r = reasoningRef.current
 		if (r) {
 			requestAnimationFrame(() => {
@@ -417,7 +397,7 @@ export default function Page() {
 				} catch {}
 			})
 		}
-	}, [draft, isStreaming, resultEditable, showPreview])
+	}, [draft, isStreaming, reasoning])
 
 	const save = async () => {
 		const body = draft.trim()
@@ -672,201 +652,52 @@ export default function Page() {
 				/>
 
 				{/* TODO（Plan の下に自動生成・編集可能） */}
-				<div
-					style={{
-						marginTop: 8,
-						padding: 8,
-						border: '1px solid #ddd',
-						background: '#fff',
-					}}>
-					<strong>TODO</strong>
-					<div style={{ marginTop: 6 }}>
-						<TodoManager value={todos} onChange={setTodos} />
-						<div
-							style={{
-								fontSize: 12,
-								color: '#666',
-								marginTop: 4,
-							}}>
-							生成時に TODO を # TODO
-							セクションとしてプロンプトに付加します。完了にチェックすると打ち消し線になります。
-						</div>
-					</div>
-				</div>
+				<TodoSection todos={todos} onTodosChange={setTodos} />
 
-				<div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-					{!isStreaming ? (
-						<>
-							<button onClick={generateFromBulletsStream}>
-								生成
-							</button>
-							<button
-								onClick={generateFromTodosStream}
-								title="TODO もPLANも空でも続行可能です">
-								TODOで生成
-							</button>
-						</>
-					) : (
-						<button onClick={stopStreaming}>停止</button>
-					)}
-				</div>
+				<GenerationControls
+					isStreaming={isStreaming}
+					onGenerate={generateFromBulletsStream}
+					onGenerateFromTodos={generateFromTodosStream}
+					onStop={stopStreaming}
+				/>
 
 				{/* kindle ハイライト（任意） */}
 				{showKindleWidget && (
-					<div
-						style={{
-							marginTop: 8,
-							padding: 8,
-							border: '1px solid #ddd',
-							background: '#fff',
-						}}>
-						<strong>Kindle ハイライト（任意）</strong>
-						<div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
-							<div
-								style={{
-									display: 'flex',
-									gap: 6,
-									alignItems: 'center',
-								}}>
-								<input
-									placeholder="書籍名フィルタ"
-									value={bookFilter}
-									onChange={(e) =>
-										setBookFilter(e.target.value)
-									}
-									style={{ flex: 1 }}
-								/>
-								<select
-									value={selectedBook}
-									onChange={(e) =>
-										loadHighlights(e.target.value)
-									}
-									style={{ flex: 1 }}>
-									<option value="">（選択しない）</option>
-									{obsBooks
-										.filter((b) =>
-											bookFilter
-												? b.title?.includes(
-														bookFilter
-												  ) ||
-												  b.author?.includes(bookFilter)
-												: true
-										)
-										.map((b) => (
-											<option
-												key={b.title}
-												value={b.title}>
-												{b.title}
-												{b.author
-													? ` / ${b.author}`
-													: ''}
-											</option>
-										))}
-								</select>
-								<a
-									href="/obsidian"
-									style={{ textDecoration: 'none' }}>
-									📚 Obsidian
-								</a>
-							</div>
-							{obsidianError && (
-								<div style={{ color: '#a00', fontSize: 12 }}>
-									{obsidianError}
-								</div>
-							)}
-							<div style={{ fontSize: 12, color: '#666' }}>
-								プレビューは最大 {HIGHLIGHT_PREVIEW_LIMIT} 件。
-								{highlights.some((h) => !h.asin) && (
-									<span
-										style={{
-											color: '#a00',
-											marginLeft: 8,
-										}}>
-										一部のハイライトに ASIN
-										がありません。引用記法に ASIN
-										が付与されない場合があります。
-									</span>
-								)}
-							</div>
-							<div
-								style={{
-									maxHeight: 220,
-									overflow: 'auto',
-									border: '1px solid #eee',
-									padding: 6,
-									background: '#fafafa',
-								}}>
-								<ul
-									style={{
-										margin: 0,
-										padding: 0,
-										listStyle: 'none',
-									}}>
-									{visibleHighlights.map((h) => (
-										<li
-											key={h.id}
-											style={{ padding: '4px 0' }}>
-											<span
-												style={{
-													whiteSpace: 'pre-wrap',
-												}}>
-												{h.text}
-											</span>
-										</li>
-									))}
-								</ul>
-							</div>
-						</div>
-					</div>
+					<KindleHighlightWidget
+						books={obsBooks}
+						bookFilter={bookFilter}
+						selectedBook={selectedBook}
+						highlights={highlights}
+						obsidianError={obsidianError}
+						onBookFilterChange={setBookFilter}
+						onBookSelect={loadHighlights}
+					/>
 				)}
 
 				{/* 過去記事をコンテキストに含める（任意） */}
 				{showPastPostsWidget && (
-					<div
-						style={{
-							marginTop: 8,
-							padding: 8,
-							border: '1px solid #ddd',
-							background: '#fff',
-						}}>
-						<strong>過去記事コンテキスト（任意）</strong>
-						<div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-							<select
-								value={selectedPost}
-								onChange={async (e) => {
-									const f = e.target.value
-									setSelectedPost(f)
-									setSelectedPostContent('')
-									if (!f) return
-									try {
-										const res = await fetch(
-											`${API_BASE}/api/drafts/posts/${encodeURIComponent(
-												f
-											)}`
-										)
-										if (res.ok) {
-											const json = await res.json()
-											setSelectedPostContent(
-												String(json.content || '')
-											)
-										}
-									} catch {}
-								}}
-								style={{ flex: 1 }}>
-								<option value="">（選択しない）</option>
-								{savedPosts.map((p) => (
-									<option key={p.filename} value={p.filename}>
-										{p.title}
-									</option>
-								))}
-							</select>
-							{selectedPost && (
-								<span style={{ fontSize: 12, color: '#666' }}>
-									本文先頭を一部（最大4000文字）参照に送信します
-								</span>
-							)}
-						</div>
-					</div>
+					<PastPostsWidget
+						savedPosts={savedPosts}
+						selectedPost={selectedPost}
+						onPostSelect={async (filename) => {
+							setSelectedPost(filename)
+							setSelectedPostContent('')
+							if (!filename) return
+							try {
+								const res = await fetch(
+									`${API_BASE}/api/drafts/posts/${encodeURIComponent(
+										filename
+									)}`
+								)
+								if (res.ok) {
+									const json = await res.json()
+									setSelectedPostContent(
+										String(json.content || '')
+									)
+								}
+							} catch {}
+						}}
+					/>
 				)}
 
 				{/* prompt（折りたたみ） */}
@@ -899,163 +730,25 @@ export default function Page() {
 				)}
 
 				{/* 生成結果表示設定（単一プレビュー＋ソース折りたたみ） */}
-				<div
-					style={{
-						marginTop: 8,
-						padding: 8,
-						border: '1px solid #ddd',
-						background: '#f8f8f8',
-						display: 'grid',
-						gap: 8,
-					}}>
-					<div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-						<label
-							style={{
-								display: 'flex',
-								alignItems: 'center',
-								gap: 4,
-							}}>
-							<input
-								type="checkbox"
-								checked={resultEditable}
-								onChange={(e) =>
-									setResultEditable(e.target.checked)
-								}
-							/>
-							<span style={{ fontSize: 12 }}>編集モード</span>
-						</label>
-						<label
-							style={{
-								display: 'flex',
-								alignItems: 'center',
-								gap: 4,
-							}}>
-							<input
-								type="checkbox"
-								checked={showPreview}
-								onChange={(e) =>
-									setShowPreview(e.target.checked)
-								}
-							/>
-							<span style={{ fontSize: 12 }}>プレビュー表示</span>
-						</label>
-						<button
-							onClick={() => {
-								navigator.clipboard
-									.writeText(draft)
-									.catch(() => {})
-							}}
-							style={{ fontSize: 12 }}>
-							コピー
-						</button>
-						<button onClick={save} style={{ fontSize: 12 }}>
-							保存
-						</button>
-						<label
-							style={{
-								display: 'flex',
-								alignItems: 'center',
-								gap: 6,
-							}}>
-							<input
-								type="checkbox"
-								checked={commitWithGit}
-								onChange={(e) =>
-									setCommitWithGit(e.target.checked)
-								}
-							/>
-							<span style={{ fontSize: 12 }}>Gitでコミット</span>
-						</label>
-						<a href="/drafts" style={{ textDecoration: 'none' }}>
-							🗂️ 保存一覧
-						</a>
-					</div>
-					{/* アイキャッチ最小UI */}
-					<div
-						style={{
-							display: 'flex',
-							gap: 8,
-							alignItems: 'center',
-						}}>
-						<button
-							onClick={generateEyecatch}
-							style={{ fontSize: 12 }}>
-							アイキャッチ生成
-						</button>
-						<select
-							value={eyecatchTheme}
-							onChange={(e) =>
-								setEyecatchTheme(
-									e.target.value as 'light' | 'dark'
-								)
-							}
-							style={{ fontSize: 12 }}>
-							<option value="light">light</option>
-							<option value="dark">dark</option>
-						</select>
-						{eyecatchUrl && (
-							<>
-								<a
-									href={eyecatchUrl}
-									download={
-										(draft.match(/^#\s*(.+)/m)?.[1] ||
-											'eyecatch') + '.svg'
-									}
-									style={{ fontSize: 12 }}>
-									SVGをダウンロード
-								</a>
-								<button
-									onClick={downloadEyecatchJpeg}
-									style={{ fontSize: 12 }}>
-									JPEGでダウンロード
-								</button>
-							</>
-						)}
-					</div>
-					{/* プレビュー（単一） */}
-					{showPreview && (
-						<div
-							ref={previewRef}
-							style={{
-								fontSize: 14,
-								lineHeight: 1.6,
-								background: '#fff',
-								border: '1px solid #eee',
-								padding: 12,
-								height: 360,
-								overflowY: 'auto',
-							}}>
-							<ReactMarkdown remarkPlugins={[remarkGfm]}>
-								{draft || ''}
-							</ReactMarkdown>
-						</div>
-					)}
-
-					{/* ソース（Markdown）を折りたたみで表示 */}
-					<Collapsible
-						title="ソース（Markdown）"
-						previewText={draft}
-						previewLines={3}
-						contentHeight={260}>
-						<textarea
-							ref={textRef}
-							value={draft}
-							onChange={(e) => setDraft(e.target.value)}
-							disabled={!resultEditable}
-							style={{
-								width: '100%',
-								minHeight: 220,
-								maxHeight: 440,
-								overflow: 'scroll',
-								fontSize: 14,
-								lineHeight: 1.5,
-								fontFamily:
-									'ui-monospace, SFMono-Regular, Menlo, monospace',
-								whiteSpace: 'pre-wrap',
-							}}
-						/>
-					</Collapsible>
-				</div>
+				<ResultDisplay
+					draft={draft}
+					resultEditable={resultEditable}
+					showPreview={showPreview}
+					commitWithGit={commitWithGit}
+					eyecatchUrl={eyecatchUrl}
+					eyecatchTheme={eyecatchTheme}
+					onDraftChange={setDraft}
+					onResultEditableChange={setResultEditable}
+					onShowPreviewChange={setShowPreview}
+					onCommitWithGitChange={setCommitWithGit}
+					onEyecatchThemeChange={setEyecatchTheme}
+					onCopy={() => {
+						navigator.clipboard.writeText(draft).catch(() => {})
+					}}
+					onSave={save}
+					onGenerateEyecatch={generateEyecatch}
+					onDownloadEyecatchJpeg={downloadEyecatchJpeg}
+				/>
 
 				{/* 編集を依頼 */}
 				<EditRequest
