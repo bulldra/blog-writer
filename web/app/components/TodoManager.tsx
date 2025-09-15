@@ -66,64 +66,52 @@ export default function TodoManager({ value, onChange }: Props) {
 	}, [])
 
 	return (
-		<div style={{ display: 'grid', gap: 8 }}>
-			<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+		<div className="grid-gap-8">
+			<div className="flex-row">
 				<input
 					placeholder="TODO を追加（Cmd/Ctrl+Enter で追加）"
 					value={input}
 					onChange={(e) => setInput(e.target.value)}
-					style={{ flex: 1 }}
+					className="flex-1"
 				/>
-				<button onClick={add} style={{ fontSize: 12 }}>
+				<button onClick={add} className="text-xs">
 					追加
 				</button>
 			</div>
 			{hasItems && (
-				<ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+				<ul className="todo-list">
 					{value.map((it, i) => (
-						<li
-							key={it.id}
-							style={{
-								display: 'flex',
-								gap: 6,
-								alignItems: 'center',
-								padding: '4px 0',
-							}}>
+						<li key={it.id} className="todo-item">
 							<input
 								type="checkbox"
 								checked={it.done}
 								onChange={() => toggle(it.id)}
+								className="todo-checkbox"
 							/>
 							<input
 								value={it.text}
 								onChange={(e) => update(it.id, e.target.value)}
-								style={{
-									flex: 1,
-									textDecoration: it.done
-										? 'line-through'
-										: 'none',
-									color: it.done ? '#666' : 'inherit',
-								}}
+								className={`todo-input ${it.done ? 'todo-done' : ''}`}
 							/>
-							<div style={{ display: 'flex', gap: 4 }}>
+							<div className="todo-buttons">
 								<button
 									onClick={() => move(it.id, -1)}
 									disabled={i === 0}
 									title="上へ"
-									style={{ fontSize: 12 }}>
+									className="text-xs">
 									↑
 								</button>
 								<button
 									onClick={() => move(it.id, 1)}
 									disabled={i === value.length - 1}
 									title="下へ"
-									style={{ fontSize: 12 }}>
+									className="text-xs">
 									↓
 								</button>
 								<button
 									onClick={() => remove(it.id)}
 									title="削除"
-									style={{ fontSize: 12 }}>
+									className="text-xs">
 									削除
 								</button>
 							</div>

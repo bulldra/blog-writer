@@ -14,15 +14,7 @@ export default function EditRequest({
 	onSubmit,
 }: Props) {
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
-				display: 'grid',
-				gap: 8,
-			}}>
+		<div className="edit-request-container">
 			<strong>編集を依頼</strong>
 			<textarea
 				value={instruction}
@@ -31,7 +23,7 @@ export default function EditRequest({
 					'例）導入を簡潔に、要点を先に。段落間の論理接続を明確に。語尾の重複を避ける。'
 				}
 				rows={3}
-				style={{ width: '100%' }}
+				className="edit-request-textarea"
 			/>
 			<div>
 				<button onClick={onSubmit} disabled={isEditing}>

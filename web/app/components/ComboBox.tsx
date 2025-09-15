@@ -84,8 +84,7 @@ export default function ComboBox({
 	return (
 		<div
 			ref={rootRef}
-			className={className}
-			style={{ position: 'relative' }}>
+			className={`combo-box ${className || ''}`}>
 			<input
 				placeholder={placeholder}
 				value={input}
@@ -112,36 +111,19 @@ export default function ComboBox({
 						setOpen(false)
 					}
 				}}
-				style={{ width: '100%' }}
+				className="combo-input"
 			/>
 			{open && (
 				<ul
 					ref={listRef}
-					style={{
-						position: 'absolute',
-						zIndex: 20,
-						top: '100%',
-						left: 0,
-						right: 0,
-						maxHeight: 240,
-						overflow: 'auto',
-						background: '#fff',
-						border: '1px solid #ccc',
-						margin: 0,
-						padding: 0,
-						listStyle: 'none',
-					}}>
+					className="combo-dropdown">
 					{filtered.map((o, idx) => (
 						<li
 							key={`${o.value}-${idx}`}
 							onMouseDown={(e) => e.preventDefault()}
 							onClick={() => commit(o.value)}
 							onMouseEnter={() => setActive(idx)}
-							style={{
-								padding: '6px 8px',
-								background: idx === active ? '#eef' : '#fff',
-								cursor: 'pointer',
-							}}
+							className={`combo-option ${idx === active ? 'selected' : ''}`}
 							title={o.value}>
 							{o.label ?? o.value}
 						</li>
@@ -152,11 +134,7 @@ export default function ComboBox({
 							<li
 								onMouseDown={(e) => e.preventDefault()}
 								onClick={() => commit(input.trim())}
-								style={{
-									padding: '6px 8px',
-									cursor: 'pointer',
-									color: '#333',
-								}}>
+								className="combo-custom-option">
 								「{input.trim()}」で検索
 							</li>
 						)}

@@ -19,25 +19,19 @@ export default function PlanPanel({
 	const count = useMemo(() => (value ? value.length : 0), [value])
 
 	return (
-		<div
-			style={{
-				marginTop: 8,
-				padding: 8,
-				border: '1px solid #ddd',
-				background: '#fff',
-			}}>
-			<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+		<div className="component-container">
+			<div className="flex-row">
 				<strong>Plan</strong>
-				<button onClick={() => onGenerate?.()} style={{ fontSize: 12 }}>
+				<button onClick={() => onGenerate?.()} className="text-xs">
 					プランを生成
 				</button>
-				<button onClick={() => onExecute?.()} style={{ fontSize: 12 }}>
+				<button onClick={() => onExecute?.()} className="text-xs">
 					プランを実行
 				</button>
-				<button onClick={() => onClear?.()} style={{ fontSize: 12 }}>
+				<button onClick={() => onClear?.()} className="text-xs">
 					クリア
 				</button>
-				<span style={{ fontSize: 12, color: '#666' }}>
+				<span className="text-xs text-secondary">
 					生成時、# PLAN セクションとしてプロンプトに付与（編集不可）
 				</span>
 			</div>
