@@ -44,7 +44,7 @@ def get_config():
             "articlesDir": config.articles_dir,
             "highlightsDir": config.highlights_dir,
         }
-    
+
     return {"rootDir": None, "articlesDir": None, "highlightsDir": None}
 
 
@@ -52,33 +52,32 @@ def get_config():
 def set_config(config_req: ObsidianConfigRequest):
     try:
         config = set_configured_obsidian_config(
-            config_req.root_dir,
-            config_req.articles_dir,
-            config_req.highlights_dir
+            config_req.root_dir, config_req.articles_dir, config_req.highlights_dir
         )
     except OSError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    
+
     # 現在の有効な設定を返す
     effective_config = get_configured_obsidian_config()
     highlights_dir = find_obsidian_highlights_dir()
     articles_dir = find_obsidian_articles_dir()
-    
+
     return {
-        "configured": {
-            "rootDir": str(config.root_dir) if config else None,
-            "articlesDir": config.articles_dir if config else None,
-            "highlightsDir": config.highlights_dir if config else None,
-        } if config else None,
+        "configured": (
+            {
+                "rootDir": str(config.root_dir) if config else None,
+                "articlesDir": config.articles_dir if config else None,
+                "highlightsDir": config.highlights_dir if config else None,
+            }
+            if config
+            else None
+        ),
         "effective": {
             "rootDir": str(effective_config.root_dir) if effective_config else None,
             "highlightsDir": str(highlights_dir) if highlights_dir else None,
             "articlesDir": str(articles_dir) if articles_dir else None,
-        }
+        },
     }
-
-
-
 
 
 @router.get("/books")
@@ -119,14 +118,17 @@ def list_articles() -> List[dict]:
     articles_dir = find_obsidian_articles_dir()
     if not articles_dir:
         raise HTTPException(status_code=404, detail="obsidian articles dir not found")
-    
+
     articles = collect_articles(articles_dir)
     return [
         {
             "path": str(article),
             "name": article.stem,
-            "relative_path": str(article.relative_to(articles_dir)) 
-                            if article.is_relative_to(articles_dir) else str(article)
+            "relative_path": (
+                str(article.relative_to(articles_dir))
+                if article.is_relative_to(articles_dir)
+                else str(article)
+            ),
         }
         for article in articles
     ]

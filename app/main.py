@@ -4,8 +4,9 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import ai, dictionary, drafts, phrases
+from app.routers import ai, dictionary, drafts, phrases, auth
 from app.routers import article_templates as article_templates_router
 from app.routers import generation_history as generation_history_router
 from app.routers import images as images_router
@@ -60,6 +61,12 @@ def setup_logging() -> None:
 def create_app() -> FastAPI:
     app = FastAPI(title="Blog Writer API", version="0.1.0")
 
+    # セッションミドルウェアの追加（Google OAuth用）
+    import os
+
+    secret_key = os.getenv("SECRET_KEY", "your-secret-key-here")
+    app.add_middleware(SessionMiddleware, secret_key=secret_key)
+
     # CORS: フロントエンド(Next.js)のDevサーバ用
     app.add_middleware(
         CORSMiddleware,
@@ -70,6 +77,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+    app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(dictionary.router, prefix="/api/dict", tags=["dictionary"])
     app.include_router(phrases.router, prefix="/api/phrases", tags=["phrases"])
     app.include_router(drafts.router, prefix="/api/drafts", tags=["drafts"])
