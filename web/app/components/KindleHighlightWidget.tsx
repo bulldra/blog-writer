@@ -31,6 +31,9 @@ export default function KindleHighlightWidget({
 	return (
 		<div className="component-container">
 			<strong>Kindle ハイライト（任意）</strong>
+			<p className="text-sm text-gray-600 mt-1 mb-4">
+				書籍を選択すると、その書籍のすべてのハイライトが記事作成の参考として使用されます。
+			</p>
 			<div className="grid-gap-6 mt-6">
 				<div className="flex-row">
 					<input
@@ -43,7 +46,7 @@ export default function KindleHighlightWidget({
 						value={selectedBook}
 						onChange={(e) => onBookSelect(e.target.value)}
 						className="flex-1">
-						<option value="">（選択しない）</option>
+						<option value="">（書籍を選択してすべてのハイライトを使用）</option>
 						{books
 							.filter((b) =>
 								bookFilter
@@ -68,9 +71,19 @@ export default function KindleHighlightWidget({
 					</div>
 				)}
 				<div className="kindle-preview-info">
-					プレビューは最大 {HIGHLIGHT_PREVIEW_LIMIT} 件。
+					{selectedBook ? (
+						<>
+							<strong>「{selectedBook}」の全ハイライト({highlights.length}件)を記事生成に使用します。</strong>
+							<br />
+							プレビュー表示は最大 {HIGHLIGHT_PREVIEW_LIMIT} 件までですが、
+							記事生成時は選択した書籍のすべてのハイライトが参考にされます。
+						</>
+					) : (
+						'書籍を選択すると、その書籍のすべてのハイライトが記事生成の参考に使用されます。'
+					)}
 					{highlights.some((h) => !h.asin) && (
 						<span className="kindle-asin-warning">
+							<br />
 							一部のハイライトに ASIN
 							がありません。引用記法に ASIN
 							が付与されない場合があります。
