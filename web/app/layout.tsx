@@ -46,12 +46,6 @@ export default function RootLayout({
 										プロンプトテンプレート
 									</span>
 								</a>
-								<a href="/obsidian" className="nav-item">
-									<span className="nav-icon" aria-hidden>
-										📚
-									</span>
-									<span className="nav-label">Obsidian 管理</span>
-								</a>
 								<a
 									href="/settings"
 									className="nav-item"
