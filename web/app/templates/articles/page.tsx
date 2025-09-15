@@ -2,11 +2,13 @@
 import { useEffect, useMemo, useState } from 'react'
 
 type Field = { key: string; label: string; input_type: 'text' | 'textarea' }
+type Widget = { id: string; name: string; description: string }
 type ArticleTemplate = {
 	type: 'url' | 'note' | 'review'
 	name: string
 	fields: Field[]
 	prompt_template: string
+	widgets: string[]
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
@@ -19,6 +21,7 @@ export default function ArticleTemplatesPage() {
 	])
 	const [current, setCurrent] = useState<'url' | 'note' | 'review'>('url')
 	const [tpl, setTpl] = useState<ArticleTemplate | null>(null)
+	const [availableWidgets, setAvailableWidgets] = useState<Widget[]>([])
 	const [loading, setLoading] = useState(false)
 	const [savedMsg, setSavedMsg] = useState<string>('')
 	const [errorMsg, setErrorMsg] = useState<string>('')
@@ -30,6 +33,10 @@ export default function ArticleTemplatesPage() {
 			const res = await fetch(`${API_BASE}/api/article-templates/${t}`)
 			if (res.ok) {
 				const json = (await res.json()) as ArticleTemplate
+				// widgets プロパティがない場合は空配列で初期化
+				if (!json.widgets) {
+					json.widgets = []
+				}
 				setTpl(json)
 			}
 		} finally {
@@ -37,10 +44,26 @@ export default function ArticleTemplatesPage() {
 		}
 	}
 
+	const loadAvailableWidgets = async () => {
+		try {
+			const res = await fetch(`${API_BASE}/api/article-templates/widgets/available`)
+			if (res.ok) {
+				const data = await res.json()
+				setAvailableWidgets(data.widgets || [])
+			}
+		} catch (error) {
+			console.error('Failed to load available widgets:', error)
+		}
+	}
+
 	useEffect(() => {
 		load(current)
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [current])
+
+	useEffect(() => {
+		loadAvailableWidgets()
+	}, [])
 
 	const updateField = (idx: number, key: keyof Field, val: string) => {
 		if (!tpl) return
@@ -66,6 +89,31 @@ export default function ArticleTemplatesPage() {
 		if (!tpl) return
 		const next = { ...tpl, fields: [...tpl.fields] }
 		next.fields.splice(idx, 1)
+		setTpl(next)
+		setErrorMsg('')
+	}
+
+	// ウィジェット管理機能
+	const addWidget = (widgetId: string) => {
+		if (!tpl || tpl.widgets.includes(widgetId)) return
+		const next = { ...tpl, widgets: [...tpl.widgets, widgetId] }
+		setTpl(next)
+		setErrorMsg('')
+	}
+
+	const removeWidget = (widgetId: string) => {
+		if (!tpl) return
+		const next = { ...tpl, widgets: tpl.widgets.filter(id => id !== widgetId) }
+		setTpl(next)
+		setErrorMsg('')
+	}
+
+	const moveWidget = (fromIndex: number, toIndex: number) => {
+		if (!tpl) return
+		const widgets = [...tpl.widgets]
+		const [moved] = widgets.splice(fromIndex, 1)
+		widgets.splice(toIndex, 0, moved)
+		const next = { ...tpl, widgets }
 		setTpl(next)
 		setErrorMsg('')
 	}
@@ -103,6 +151,7 @@ export default function ArticleTemplatesPage() {
 					name: tpl.name,
 					fields: tpl.fields,
 					prompt_template: tpl.prompt_template,
+					widgets: tpl.widgets,
 				}),
 			}
 		)
@@ -143,12 +192,21 @@ export default function ArticleTemplatesPage() {
 		lines.push(`# ${tpl.name}`)
 		lines.push('項目一覧:')
 		for (const f of tpl.fields) lines.push(`- ${f.label} (${f.key})`)
+		
+		if (tpl.widgets && tpl.widgets.length > 0) {
+			lines.push('\nウィジェット:')
+			for (const widgetId of tpl.widgets) {
+				const widget = availableWidgets.find(w => w.id === widgetId)
+				lines.push(`- ${widget ? widget.name : widgetId}`)
+			}
+		}
+		
 		if (tpl.prompt_template?.trim()) {
 			lines.push('\n--- プロンプトテンプレプレビュー ---')
 			lines.push(tpl.prompt_template)
 		}
 		return lines.join('\n')
-	}, [tpl])
+	}, [tpl, availableWidgets])
 
 	return (
 		<div style={{ maxWidth: 1000, margin: '2rem auto', padding: '0 1rem' }}>
@@ -265,6 +323,107 @@ export default function ArticleTemplatesPage() {
 							style={{ width: '100%' }}
 							placeholder="{{title}}, {{style}}, {{length}}, {{bullets}}, {{highlights}}, {{url_context}}, {{base}} などが使用可能"
 						/>
+					</div>
+
+					<div>
+						<strong>ウィジェット設定</strong>
+						<div style={{ display: 'grid', gap: 8, marginTop: 6 }}>
+							<div>
+								<strong style={{ fontSize: 14 }}>利用中のウィジェット</strong>
+								{tpl.widgets.length === 0 ? (
+									<div style={{ fontSize: 12, color: '#666', padding: 8 }}>
+										利用中のウィジェットはありません
+									</div>
+								) : (
+									<div style={{ border: '1px solid #ddd', padding: 8, marginTop: 4 }}>
+										{tpl.widgets.map((widgetId, index) => {
+											const widget = availableWidgets.find(w => w.id === widgetId)
+											return (
+												<div
+													key={widgetId}
+													style={{
+														display: 'flex',
+														alignItems: 'center',
+														gap: 8,
+														padding: '4px 0',
+														borderBottom: index < tpl.widgets.length - 1 ? '1px solid #eee' : 'none'
+													}}>
+													<div style={{ flex: 1 }}>
+														<strong>{widget ? widget.name : widgetId}</strong>
+														{widget && (
+															<div style={{ fontSize: 12, color: '#666' }}>
+																{widget.description}
+															</div>
+														)}
+													</div>
+													<div style={{ display: 'flex', gap: 4 }}>
+														{index > 0 && (
+															<button
+																onClick={() => moveWidget(index, index - 1)}
+																style={{ fontSize: 12, padding: '2px 6px' }}
+																title="上に移動">
+																↑
+															</button>
+														)}
+														{index < tpl.widgets.length - 1 && (
+															<button
+																onClick={() => moveWidget(index, index + 1)}
+																style={{ fontSize: 12, padding: '2px 6px' }}
+																title="下に移動">
+																↓
+															</button>
+														)}
+														<button
+															onClick={() => removeWidget(widgetId)}
+															style={{ fontSize: 12, padding: '2px 6px', color: '#a00' }}
+															title="削除">
+															削除
+														</button>
+													</div>
+												</div>
+											)
+										})}
+									</div>
+								)}
+							</div>
+							
+							<div>
+								<strong style={{ fontSize: 14 }}>追加可能なウィジェット</strong>
+								<div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
+									{availableWidgets
+										.filter(widget => !tpl.widgets.includes(widget.id))
+										.map(widget => (
+											<div
+												key={widget.id}
+												style={{
+													display: 'flex',
+													alignItems: 'center',
+													gap: 8,
+													padding: 8,
+													border: '1px solid #eee',
+													background: '#fafafa'
+												}}>
+												<div style={{ flex: 1 }}>
+													<strong>{widget.name}</strong>
+													<div style={{ fontSize: 12, color: '#666' }}>
+														{widget.description}
+													</div>
+												</div>
+												<button
+													onClick={() => addWidget(widget.id)}
+													style={{ fontSize: 12, padding: '4px 8px' }}>
+													追加
+												</button>
+											</div>
+										))}
+								</div>
+								{availableWidgets.filter(w => !tpl.widgets.includes(w.id)).length === 0 && (
+									<div style={{ fontSize: 12, color: '#666', padding: 8 }}>
+										すべてのウィジェットが利用中です
+									</div>
+								)}
+							</div>
+						</div>
 					</div>
 
 					<div>

@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from app.storage import (
     delete_article_template,
     get_article_template,
+    get_available_widgets,
     list_article_templates,
     save_article_template,
 )
@@ -42,3 +43,9 @@ def delete_one(t: str):
     if not ok:
         raise HTTPException(status_code=400, detail="invalid type")
     return {"ok": True}
+
+
+@router.get("/widgets/available")
+def get_available_widget_types():
+    """利用可能なウィジェットタイプの一覧を取得"""
+    return {"widgets": get_available_widgets()}
