@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[oc]
+*.egg-info/
+build/
+dist/
+wheels/
+.python-version
+.venv/
+
+# Node / Next.js (web)
+web/node_modules/
+web/.next/
+web/.env*
+web/out/
+
+# Logs
+*.log
+log/
+
+# Local data and caches
+data/*
+!data/.gitkeep
+cache/
+
+# cache
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+uv.lock
+package-lock.json
+
+# Editor/IDE
+.vscode/
+.idea/
