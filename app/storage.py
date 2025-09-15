@@ -11,6 +11,7 @@ DATA_DIR = Path(os.getenv("BLOGWRITER_DATA_DIR", "./data")).resolve()
 SETTINGS_FILE = DATA_DIR / "settings.json"
 DRAFTS_FILE = DATA_DIR / "drafts.json"
 PHRASES_FILE = DATA_DIR / "phrases.json"
+GENERATION_HISTORY_FILE = DATA_DIR / "generation_history.json"
 POSTS_DIR = DATA_DIR / "posts"
 
 _lock = threading.Lock()
@@ -54,6 +55,8 @@ def init_storage() -> None:
             _atomic_write(DRAFTS_FILE, {"next_id": 1, "items": []})
         if not PHRASES_FILE.exists():
             _atomic_write(PHRASES_FILE, {"next_id": 1, "items": []})
+        if not GENERATION_HISTORY_FILE.exists():
+            _atomic_write(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
     POSTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -461,6 +464,11 @@ _BUILTIN_ARTICLE_TYPES = {"url", "note", "review"}
 
 # ウィジェットタイプの定義
 WIDGET_TYPES = {
+    "properties": {
+        "id": "properties",
+        "name": "プロパティセット",
+        "description": "記事のメタデータやカスタムフィールドを設定します"
+    },
     "url_context": {
         "id": "url_context",
         "name": "URL コンテキスト",
@@ -672,3 +680,94 @@ def get_available_widgets() -> List[Dict[str, str]]:
         }
         for widget_info in WIDGET_TYPES.values()
     ]
+
+
+# ===== Generation History =====
+def save_generation_history(
+    title: str,
+    template_type: str,
+    widgets_used: List[str],
+    properties: Dict[str, str],
+    generated_content: str,
+    reasoning: str = ""
+) -> Dict[str, Any]:
+    """生成履歴を保存する"""
+    with _lock:
+        data = _read_json(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
+        next_id = int(data.get("next_id", 1))
+        now = _now_iso()
+        
+        history_item = {
+            "id": next_id,
+            "title": title,
+            "template_type": template_type,
+            "widgets_used": widgets_used,
+            "properties": properties,
+            "generated_content": generated_content,
+            "reasoning": reasoning,
+            "created_at": now,
+        }
+        
+        items = list(data.get("items", []))
+        items.append(history_item)
+        
+        # 最新100件まで保持
+        if len(items) > 100:
+            items = items[-100:]
+        
+        _atomic_write(GENERATION_HISTORY_FILE, {"next_id": next_id + 1, "items": items})
+        return history_item
+
+
+def list_generation_history(limit: int = 20) -> List[Dict[str, Any]]:
+    """生成履歴一覧を取得する"""
+    with _lock:
+        data = _read_json(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
+        items = data.get("items", [])
+        assert isinstance(items, list)
+        
+        result = []
+        for item in items:
+            result.append({
+                "id": int(item["id"]),
+                "title": str(item.get("title", "")),
+                "template_type": str(item.get("template_type", "")),
+                "widgets_used": list(item.get("widgets_used", [])),
+                "properties": dict(item.get("properties", {})),
+                "created_at": str(item.get("created_at", _now_iso())),
+                "content_length": len(str(item.get("generated_content", ""))),
+            })
+        
+        return sorted(result, key=lambda d: d["created_at"], reverse=True)[:limit]
+
+
+def get_generation_history(history_id: int) -> Optional[Dict[str, Any]]:
+    """特定の生成履歴を取得する"""
+    with _lock:
+        data = _read_json(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
+        for item in data.get("items", []):
+            if int(item.get("id")) == history_id:
+                return {
+                    "id": int(item["id"]),
+                    "title": str(item.get("title", "")),
+                    "template_type": str(item.get("template_type", "")),
+                    "widgets_used": list(item.get("widgets_used", [])),
+                    "properties": dict(item.get("properties", {})),
+                    "generated_content": str(item.get("generated_content", "")),
+                    "reasoning": str(item.get("reasoning", "")),
+                    "created_at": str(item.get("created_at", _now_iso())),
+                }
+        return None
+
+
+def delete_generation_history(history_id: int) -> bool:
+    """生成履歴を削除する"""
+    with _lock:
+        data = _read_json(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
+        items = list(data.get("items", []))
+        new_items = [item for item in items if int(item.get("id")) != history_id]
+        if len(new_items) == len(items):
+            return False
+        data["items"] = new_items
+        _atomic_write(GENERATION_HISTORY_FILE, data)
+        return True

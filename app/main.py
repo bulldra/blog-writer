@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import ai, dictionary, drafts, phrases
 from app.routers import article_templates as article_templates_router
+from app.routers import generation_history as generation_history_router
 from app.routers import images as images_router
 from app.routers import migrations as migrations_router
 from app.routers import obsidian as obsidian_router
@@ -86,6 +87,11 @@ def create_app() -> FastAPI:
         article_templates_router.router,
         prefix="/api/article-templates",
         tags=["article-templates"],
+    )
+    app.include_router(
+        generation_history_router.router,
+        prefix="/api/generation-history",
+        tags=["generation-history"],
     )
 
     @app.get("/api/health")
