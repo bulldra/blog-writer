@@ -2,8 +2,6 @@
 ダークモード機能のテスト
 """
 
-import pytest
-from unittest.mock import Mock, patch
 
 
 def test_theme_provider_initial_state():

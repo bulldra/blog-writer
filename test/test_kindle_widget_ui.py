@@ -1,6 +1,5 @@
 """KindleHighlightWidgetコンポーネントのUIテスト"""
 
-import unittest
 from unittest.mock import Mock, patch
 from app.main import create_app
 from fastapi.testclient import TestClient

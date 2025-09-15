@@ -37,3 +37,10 @@ module = [
 ]
 ignore_missing_imports = true
 
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "mypy>=1.18.1",
+    "ruff>=0.13.0",
+]
+

@@ -1,4 +1,3 @@
-from typing import Dict, List
 
 from app.storage import (
     delete_generation_history,
