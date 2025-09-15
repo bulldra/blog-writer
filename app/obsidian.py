@@ -152,16 +152,6 @@ def set_configured_obsidian_config(
     return None
 
 
-def get_configured_obsidian_dir() -> Optional[Path]:
-    """下位互換性のための関数"""
-    config = get_configured_obsidian_config()
-    return config.root_dir if config else None
-
-
-def set_configured_obsidian_dir(path: Optional[str]) -> Optional[Path]:
-    """下位互換性のための関数"""
-    config = set_configured_obsidian_config(path)
-    return config.root_dir if config else None
 
 
 def find_obsidian_highlights_dir() -> Optional[Path]:

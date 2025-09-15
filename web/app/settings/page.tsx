@@ -60,8 +60,8 @@ export default function SettingsPage() {
 				const r = await fetch(`${API_BASE}/api/obsidian/config`)
 				if (r.ok) {
 					const j = await r.json()
-					setObsidianDir(j?.obsidianDir || '')
-					setObsidianDirInput(j?.obsidianDir || '')
+					setObsidianDir(j?.rootDir || '')
+					setObsidianDirInput(j?.rootDir || '')
 				}
 			} catch {
 				/* noop */
@@ -97,15 +97,19 @@ export default function SettingsPage() {
 	const saveObsidian = async (path: string | null) => {
 		setObsidianSaving(true)
 		try {
-			const url = path
-				? `${API_BASE}/api/obsidian/config?path=${encodeURIComponent(
-						path
-				  )}`
-				: `${API_BASE}/api/obsidian/config`
-			const r = await fetch(url, { method: 'POST' })
+			const config = {
+				root_dir: path || null,
+				articles_dir: "articles",
+				highlights_dir: "kindle_highlights"
+			}
+			const r = await fetch(`${API_BASE}/api/obsidian/config`, { 
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(config)
+			})
 			if (r.ok) {
 				const j = await r.json()
-				setObsidianDir(j?.effective || '')
+				setObsidianDir(j?.effective?.rootDir || '')
 				if (!path) setObsidianDirInput('')
 			} else {
 				alert('設定に失敗しました')

@@ -161,17 +161,6 @@ def test_set_config_endpoint_invalid_dir(client, api_settings):
     assert "Invalid directory" in response.json()["detail"]
 
 
-def test_legacy_config_endpoint(client, api_settings):
-    """旧設定APIエンドポイントテスト"""
-    root_dir = str(api_settings["obsidian_root"])
-    
-    response = client.post(f"/api/obsidian/config/legacy?path={root_dir}")
-    assert response.status_code == 200
-    
-    data = response.json()
-    assert data["configured"] == root_dir
-    assert data["effective"] == root_dir
-
 
 def test_articles_endpoint(client, api_settings):
     """記事一覧エンドポイントテスト"""

@@ -10,10 +10,8 @@ from app.obsidian import (
     find_obsidian_dir,
     find_obsidian_highlights_dir,
     get_configured_obsidian_config,
-    get_configured_obsidian_dir,
     list_books_from_highlights,
     set_configured_obsidian_config,
-    set_configured_obsidian_dir,
 )
 
 router = APIRouter()
@@ -45,15 +43,6 @@ def get_config():
             "rootDir": str(config.root_dir),
             "articlesDir": config.articles_dir,
             "highlightsDir": config.highlights_dir,
-        }
-    
-    # 下位互換性: 旧設定チェック
-    old_dir = get_configured_obsidian_dir()
-    if old_dir:
-        return {
-            "rootDir": str(old_dir),
-            "articlesDir": "articles",
-            "highlightsDir": "kindle_highlights",
         }
     
     return {"rootDir": None, "articlesDir": None, "highlightsDir": None}
@@ -89,22 +78,7 @@ def set_config(config_req: ObsidianConfigRequest):
     }
 
 
-@router.post("/config/legacy")
-def set_config_legacy(
-    path: Optional[str] = Query(
-        None, description="Obsidian ディレクトリの絶対パス。空でクリア"
-    )
-):
-    """下位互換性のための旧API"""
-    try:
-        p = set_configured_obsidian_dir(path)
-    except OSError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    root = find_obsidian_dir()
-    return {
-        "configured": str(p) if p else None,
-        "effective": str(root) if root else None,
-    }
+
 
 
 @router.get("/books")
