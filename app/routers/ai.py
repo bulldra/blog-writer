@@ -11,11 +11,11 @@ from google.genai import types as genai_types
 from pydantic import BaseModel
 
 from app.ai_utils import (
-    apply_prompt_template, 
-    build_bullets_prompt, 
-    extract_text, 
+    apply_prompt_template,
+    build_bullets_prompt,
+    extract_text,
     generate_rag_query,
-    inject_rag_context
+    inject_rag_context,
 )
 from app.security import decrypt_text, encrypt_text, is_url_allowed
 from app.storage import get_ai_settings, save_ai_settings
@@ -164,16 +164,19 @@ async def generate(req: GenerateRequest):
     if req.enable_rag:
         try:
             from app.routers.epub import get_rag_manager
+
             rag_manager = get_rag_manager()
-            
+
             # 検索クエリを生成
             search_query = generate_rag_query(req.prompt, req.title)
             _logger.info(f"RAG検索クエリ: {search_query}")
-            
+
             if search_query.strip():
                 if req.rag_book_name:
                     # 特定の書籍で検索
-                    results = rag_manager.search_in_book(req.rag_book_name, search_query, 5, 0.1)
+                    results = rag_manager.search_in_book(
+                        req.rag_book_name, search_query, 5, 0.1
+                    )
                     rag_context = rag_manager.format_search_results(results)
                 else:
                     # 全書籍で検索
@@ -184,8 +187,10 @@ async def generate(req: GenerateRequest):
                         combined_results.extend(book_results)
                     # スコア順でソートして上位5件
                     combined_results.sort(key=lambda x: x[2], reverse=True)
-                    rag_context = rag_manager.format_search_results(combined_results[:5])
-                
+                    rag_context = rag_manager.format_search_results(
+                        combined_results[:5]
+                    )
+
                 _logger.info(f"RAG検索結果取得: {len(rag_context)}文字")
         except Exception as e:
             _logger.warning(f"RAG検索エラー: {e}")
@@ -193,7 +198,7 @@ async def generate(req: GenerateRequest):
 
     # プロンプトの基本処理
     base_prompt = (req.prompt or "")[:max_len]
-    
+
     # RAGコンテキストを注入
     if rag_context:
         base_prompt = inject_rag_context(base_prompt, rag_context)

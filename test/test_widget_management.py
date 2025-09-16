@@ -10,7 +10,7 @@ from app.storage import (
 
 def test_widget_types_defined():
     """ウィジェットタイプが正しく定義されていることを確認"""
-    expected_widgets = {"properties", "url_context", "kindle", "past_posts", "epub", "notion"}
+    expected_widgets = {"properties", "url_context", "kindle", "past_posts", "epub"}
     assert set(WIDGET_TYPES.keys()) == expected_widgets
 
     for widget_id, widget_info in WIDGET_TYPES.items():

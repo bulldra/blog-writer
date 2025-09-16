@@ -10,8 +10,8 @@ from typing import Any, Dict, List, Optional, Tuple
 DATA_DIR = Path(os.getenv("BLOGWRITER_DATA_DIR", "./data")).resolve()
 SETTINGS_FILE = DATA_DIR / "settings.json"
 DRAFTS_FILE = DATA_DIR / "drafts.json"
-PHRASES_FILE = DATA_DIR / "phrases.json"
 GENERATION_HISTORY_FILE = DATA_DIR / "generation_history.json"
+WRITING_STYLES_FILE = DATA_DIR / "writing_styles.json"
 POSTS_DIR = DATA_DIR / "posts"
 EPUB_CACHE_DIR = DATA_DIR / "epub_cache"
 
@@ -54,10 +54,10 @@ def init_storage() -> None:
             )
         if not DRAFTS_FILE.exists():
             _atomic_write(DRAFTS_FILE, {"next_id": 1, "items": []})
-        if not PHRASES_FILE.exists():
-            _atomic_write(PHRASES_FILE, {"next_id": 1, "items": []})
         if not GENERATION_HISTORY_FILE.exists():
             _atomic_write(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
+        if not WRITING_STYLES_FILE.exists():
+            _atomic_write(WRITING_STYLES_FILE, {"items": {}})
     POSTS_DIR.mkdir(parents=True, exist_ok=True)
     EPUB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -211,58 +211,6 @@ def delete_draft(draft_id: int) -> bool:
             return False
         data["items"] = new_items
         _atomic_write(DRAFTS_FILE, data)
-        return True
-
-
-# ===== Phrases =====
-def list_phrases() -> List[Dict[str, Any]]:
-    with _lock:
-        data = _read_json(PHRASES_FILE, {"next_id": 1, "items": []})
-        items = data.get("items", [])
-        assert isinstance(items, list)
-        return sorted(
-            [
-                {
-                    "id": int(it["id"]),
-                    "text": str(it.get("text", "")),
-                    "note": (str(it["note"]) if it.get("note") is not None else None),
-                    "created_at": str(it.get("created_at", _now_iso())),
-                    "updated_at": str(it.get("updated_at", _now_iso())),
-                }
-                for it in items
-            ],
-            key=lambda d: (d["updated_at"], d["id"]),
-            reverse=True,
-        )
-
-
-def create_phrase(text: str, note: Optional[str] = None) -> Dict[str, Any]:
-    with _lock:
-        data = _read_json(PHRASES_FILE, {"next_id": 1, "items": []})
-        next_id = int(data.get("next_id", 1))
-        now = _now_iso()
-        row = {
-            "id": next_id,
-            "text": text,
-            "note": note,
-            "created_at": now,
-            "updated_at": now,
-        }
-        items = list(data.get("items", []))
-        items.append(row)
-        _atomic_write(PHRASES_FILE, {"next_id": next_id + 1, "items": items})
-        return row
-
-
-def delete_phrase(phrase_id: int) -> bool:
-    with _lock:
-        data = _read_json(PHRASES_FILE, {"next_id": 1, "items": []})
-        items = list(data.get("items", []))
-        new_items = [it for it in items if int(it.get("id")) != phrase_id]
-        if len(new_items) == len(items):
-            return False
-        data["items"] = new_items
-        _atomic_write(PHRASES_FILE, data)
         return True
 
 
@@ -836,11 +784,15 @@ def get_epub_settings() -> Dict[str, Any]:
         epub_config = data.get("epub", {})
         return {
             "epub_directory": str(epub_config.get("epub_directory", "")),
-            "embedding_model": str(epub_config.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")),
+            "embedding_model": str(
+                epub_config.get(
+                    "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
+                )
+            ),
             "chunk_size": int(epub_config.get("chunk_size", 500)),
             "overlap_size": int(epub_config.get("overlap_size", 50)),
             "search_top_k": int(epub_config.get("search_top_k", 5)),
-            "min_similarity_score": float(epub_config.get("min_similarity_score", 0.1))
+            "min_similarity_score": float(epub_config.get("min_similarity_score", 0.1)),
         }
 
 
@@ -850,20 +802,88 @@ def save_epub_settings(
     chunk_size: int = 500,
     overlap_size: int = 50,
     search_top_k: int = 5,
-    min_similarity_score: float = 0.1
+    min_similarity_score: float = 0.1,
 ) -> None:
     """EPUB設定を保存する"""
     with _lock:
         data = _read_json(SETTINGS_FILE, {})
-        
+
         epub_config = {
             "epub_directory": str(epub_directory),
             "embedding_model": str(embedding_model),
             "chunk_size": max(100, min(2000, int(chunk_size))),
             "overlap_size": max(0, min(500, int(overlap_size))),
             "search_top_k": max(1, min(20, int(search_top_k))),
-            "min_similarity_score": max(0.0, min(1.0, float(min_similarity_score)))
+            "min_similarity_score": max(0.0, min(1.0, float(min_similarity_score))),
         }
-        
+
         data["epub"] = epub_config
         _atomic_write(SETTINGS_FILE, data)
+
+
+def save_writing_style(
+    style_id: str, style_data: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """文体テンプレートを保存する"""
+    with _lock:
+        data = _read_json(WRITING_STYLES_FILE, {"items": {}})
+
+        # バリデーション
+        if not isinstance(style_data, dict):
+            return None
+
+        # 必須フィールドのチェック
+        required_fields = ["name", "properties", "source_text", "description"]
+        for field in required_fields:
+            if field not in style_data:
+                return None
+
+        # タイムスタンプ付きで保存
+        now_str = datetime.now(UTC).isoformat()
+        style_item = {
+            "id": style_id,
+            "name": str(style_data["name"]),
+            "properties": (
+                dict(style_data["properties"])
+                if isinstance(style_data["properties"], dict)
+                else {}
+            ),
+            "source_text": str(style_data["source_text"]),
+            "description": str(style_data["description"]),
+            "created_at": style_data.get("created_at", now_str),
+            "updated_at": now_str,
+        }
+
+        data["items"][style_id] = style_item
+        _atomic_write(WRITING_STYLES_FILE, data)
+
+        return style_item
+
+
+def get_writing_style(style_id: str) -> Optional[Dict[str, Any]]:
+    """文体テンプレートを取得する"""
+    with _lock:
+        data = _read_json(WRITING_STYLES_FILE, {"items": {}})
+        return data["items"].get(style_id)
+
+
+def list_writing_styles() -> List[Dict[str, Any]]:
+    """文体テンプレート一覧を取得する"""
+    with _lock:
+        data = _read_json(WRITING_STYLES_FILE, {"items": {}})
+        styles = list(data["items"].values())
+        # 更新日時の降順でソート
+        styles.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+        return styles
+
+
+def delete_writing_style(style_id: str) -> bool:
+    """文体テンプレートを削除する"""
+    with _lock:
+        data = _read_json(WRITING_STYLES_FILE, {"items": {}})
+        if style_id not in data["items"]:
+            return False
+
+        del data["items"][style_id]
+        _atomic_write(WRITING_STYLES_FILE, data)
+        return True

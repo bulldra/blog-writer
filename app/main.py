@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import ai, dictionary, drafts, phrases, auth
+from app.routers import ai, drafts, auth
 from app.routers import article_templates as article_templates_router
 from app.routers import epub as epub_router
 from app.routers import generation_history as generation_history_router
@@ -15,6 +15,7 @@ from app.routers import migrations as migrations_router
 from app.routers import obsidian as obsidian_router
 from app.routers import templates as templates_router
 from app.routers import notion as notion_router
+from app.routers import writing_styles as writing_styles_router
 from app.storage import init_storage
 
 
@@ -80,8 +81,6 @@ def create_app() -> FastAPI:
 
     app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-    app.include_router(dictionary.router, prefix="/api/dict", tags=["dictionary"])
-    app.include_router(phrases.router, prefix="/api/phrases", tags=["phrases"])
     app.include_router(drafts.router, prefix="/api/drafts", tags=["drafts"])
     app.include_router(epub_router.router, prefix="/api/epub", tags=["epub"])
     app.include_router(
@@ -108,6 +107,11 @@ def create_app() -> FastAPI:
         notion_router.router,
         prefix="/api/notion",
         tags=["notion"],
+    )
+    app.include_router(
+        writing_styles_router.router,
+        prefix="/api/writing-styles",
+        tags=["writing-styles"],
     )
 
     @app.get("/api/health")
