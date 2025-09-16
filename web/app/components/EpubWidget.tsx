@@ -44,8 +44,16 @@ export function EpubWidget({ onResultChange, isEnabled = true }: EpubWidgetProps
   });
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingBooks, setIsLoadingBooks] = useState(false);
-  const [selectedHighlights, setSelectedHighlights] = useState<any[]>([]);
+  const [selectedHighlights, setSelectedHighlights] = useState<Highlight[]>([]);
   const [useHighlightsContext, setUseHighlightsContext] = useState(false);
+
+interface Highlight {
+  id: number;
+  book_title: string;
+  chapter_title: string;
+  highlighted_text: string;
+  created_at: string;
+}
 
   // 設定を読み込み
   useEffect(() => {
@@ -199,8 +207,10 @@ export function EpubWidget({ onResultChange, isEnabled = true }: EpubWidgetProps
         } else {
           // 全書籍検索の結果を統合
           const allResults: EpubSearchResult[] = [];
-          Object.values(data.results || {}).forEach((bookResults: any) => {
-            allResults.push(...bookResults);
+          Object.values(data.results || {}).forEach((bookResults) => {
+            if (Array.isArray(bookResults)) {
+              allResults.push(...(bookResults as EpubSearchResult[]));
+            }
           });
           // スコア順でソート
           allResults.sort((a, b) => b.score - a.score);
@@ -319,7 +329,7 @@ export function EpubWidget({ onResultChange, isEnabled = true }: EpubWidgetProps
             <div className="selected-highlights-preview">
               <h5>選択されたハイライト:</h5>
               <div className="highlights-list-compact">
-                {selectedHighlights.slice(0, 3).map((highlight, i) => (
+                {selectedHighlights.slice(0, 3).map((highlight) => (
                   <div key={highlight.id} className="highlight-preview">
                     <span className="highlight-book">{highlight.book_title}</span>
                     <span className="highlight-text-preview">

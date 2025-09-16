@@ -281,7 +281,7 @@ export default function EpubReader() {
 
                 {selectedText && (
                   <div className="selection-popup">
-                    <p>選択されたテキスト: "{selectedText.slice(0, 50)}..."</p>
+                    <p>選択されたテキスト: &quot;{selectedText.slice(0, 50)}...&quot;</p>
                     <button onClick={createHighlight} className="btn-primary">
                       ハイライトを作成
                     </button>
