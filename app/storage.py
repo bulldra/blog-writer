@@ -491,6 +491,11 @@ WIDGET_TYPES = {
         "name": "EPUB書籍検索",
         "description": "EPUBファイルからベクトル検索でRAG機能を提供し、書籍内容を記事作成の参考にします",
     },
+    "notion": {
+        "id": "notion",
+        "name": "Notion連携",
+        "description": "NotionのページやデータベースからMCP経由で情報を取得し、記事作成の参考にします",
+    },
 }
 
 _ALLOWED_WIDGETS = set(WIDGET_TYPES.keys())
@@ -780,6 +785,48 @@ def delete_generation_history(history_id: int) -> bool:
         data["items"] = new_items
         _atomic_write(GENERATION_HISTORY_FILE, data)
         return True
+
+
+def get_notion_settings() -> Dict[str, Any]:
+    """Notion MCP設定を取得する"""
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        notion_config = data.get("notion", {})
+        return {
+            "command": str(notion_config.get("command", "npx")),
+            "args": list(notion_config.get("args", ["@modelcontextprotocol/server-notion"])),
+            "env": dict(notion_config.get("env", {"NOTION_API_KEY": ""})),
+            "enabled": bool(notion_config.get("enabled", False)),
+            "default_parent_id": str(notion_config.get("default_parent_id", "")),
+        }
+
+
+def save_notion_settings(
+    command: str = "npx",
+    args: List[str] = None,
+    env: Dict[str, str] = None,
+    enabled: bool = False,
+    default_parent_id: str = "",
+) -> None:
+    """Notion MCP設定を保存する"""
+    if args is None:
+        args = ["@modelcontextprotocol/server-notion"]
+    if env is None:
+        env = {"NOTION_API_KEY": ""}
+        
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        
+        notion_config = {
+            "command": str(command),
+            "args": list(args),
+            "env": dict(env),
+            "enabled": bool(enabled),
+            "default_parent_id": str(default_parent_id),
+        }
+        
+        data["notion"] = notion_config
+        _atomic_write(SETTINGS_FILE, data)
 
 
 def get_epub_settings() -> Dict[str, Any]:

@@ -47,6 +47,7 @@ class GenerateRequest(BaseModel):
     enable_rag: bool = False
     rag_book_name: Optional[str] = None
     title: Optional[str] = None
+    notion_context: Optional[str] = None
 
 
 @router.get("/settings")
@@ -301,6 +302,7 @@ class BulletsRequest(BaseModel):
     prompt_template: Optional[str] = None
     article_type: Optional[Literal["url", "note", "review"]] = None
     extra_context: Optional[Mapping[str, str]] = None
+    notion_context: Optional[str] = None
 
 
 _apply_prompt_template = apply_prompt_template

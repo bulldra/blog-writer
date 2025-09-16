@@ -17,6 +17,7 @@ class BulletsParams(Protocol):
     prompt_template: Optional[str]
     url_context: Optional[str]
     extra_context: Optional[Mapping[str, str]]
+    notion_context: Optional[str]
 
 
 def extract_text(html: str) -> str:
@@ -48,6 +49,8 @@ def build_bullets_prompt(req: BulletsParams, bullets: List[str]) -> str:
     )
     if req.url_context:
         base_prompt += f"参照URL: {req.url_context}\n"
+    if req.notion_context:
+        base_prompt += "\n[Notion参考情報]\n" + req.notion_context + "\n"
     if bullets_block:
         base_prompt += "[入れ込みたい要素]\n" + bullets_block + "\n"
     if req.highlights:
@@ -78,6 +81,7 @@ def build_bullets_prompt(req: BulletsParams, bullets: List[str]) -> str:
             "highlights": highlights_str,
             "base": base_prompt,
             "url_context": req.url_context or "",
+            "notion_context": req.notion_context or "",
         }
         # extra_context をそのまま埋め込み可能にする
         if req.extra_context:

@@ -14,6 +14,7 @@ from app.routers import images as images_router
 from app.routers import migrations as migrations_router
 from app.routers import obsidian as obsidian_router
 from app.routers import templates as templates_router
+from app.routers import notion as notion_router
 from app.storage import init_storage
 
 
@@ -102,6 +103,11 @@ def create_app() -> FastAPI:
         generation_history_router.router,
         prefix="/api/generation-history",
         tags=["generation-history"],
+    )
+    app.include_router(
+        notion_router.router,
+        prefix="/api/notion",
+        tags=["notion"],
     )
 
     @app.get("/api/health")

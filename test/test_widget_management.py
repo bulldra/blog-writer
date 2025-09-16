@@ -10,7 +10,7 @@ from app.storage import (
 
 def test_widget_types_defined():
     """ウィジェットタイプが正しく定義されていることを確認"""
-    expected_widgets = {"properties", "url_context", "kindle", "past_posts"}
+    expected_widgets = {"properties", "url_context", "kindle", "past_posts", "epub", "notion"}
     assert set(WIDGET_TYPES.keys()) == expected_widgets
 
     for widget_id, widget_info in WIDGET_TYPES.items():
@@ -25,10 +25,10 @@ def test_get_available_widgets():
     """利用可能なウィジェット一覧の取得をテスト"""
     widgets = get_available_widgets()
     assert isinstance(widgets, list)
-    assert len(widgets) == 4
+    assert len(widgets) == 6
 
     widget_ids = [w["id"] for w in widgets]
-    assert set(widget_ids) == {"properties", "url_context", "kindle", "past_posts"}
+    assert set(widget_ids) == {"properties", "url_context", "kindle", "past_posts", "epub", "notion"}
 
     for widget in widgets:
         assert "id" in widget
