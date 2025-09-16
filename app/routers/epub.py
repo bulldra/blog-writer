@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -23,8 +23,7 @@ def get_rag_manager() -> RAGManager:
     if _rag_manager is None:
         settings = get_epub_settings()
         _rag_manager = RAGManager(
-            cache_dir=EPUB_CACHE_DIR,
-            embedding_model=settings["embedding_model"]
+            cache_dir=EPUB_CACHE_DIR, embedding_model=settings["embedding_model"]
         )
     return _rag_manager
 
@@ -67,13 +66,13 @@ def update_settings(settings: EpubSettingsUpdate):
             chunk_size=settings.chunk_size,
             overlap_size=settings.overlap_size,
             search_top_k=settings.search_top_k,
-            min_similarity_score=settings.min_similarity_score
+            min_similarity_score=settings.min_similarity_score,
         )
-        
+
         # RAGマネージャーをリセット（新しい設定で再初期化）
         global _rag_manager
         _rag_manager = None
-        
+
         return {"status": "success", "message": "設定を更新しました"}
     except Exception as e:
         _logger.error(f"設定更新エラー: {e}")
@@ -97,28 +96,33 @@ def index_epub_files(request: IndexRequest):
     """EPUBファイルをインデックス化"""
     try:
         settings = get_epub_settings()
-        
+
         # リクエストパラメータまたは設定値を使用
         epub_directory = request.epub_directory or settings["epub_directory"]
         chunk_size = request.chunk_size or settings["chunk_size"]
         overlap_size = request.overlap_size or settings["overlap_size"]
-        
+
         if not epub_directory:
-            raise HTTPException(status_code=400, detail="EPUBディレクトリが設定されていません")
-        
+            raise HTTPException(
+                status_code=400, detail="EPUBディレクトリが設定されていません"
+            )
+
         epub_dir = Path(epub_directory)
         if not epub_dir.exists():
-            raise HTTPException(status_code=404, detail=f"ディレクトリが見つかりません: {epub_directory}")
-        
+            raise HTTPException(
+                status_code=404,
+                detail=f"ディレクトリが見つかりません: {epub_directory}",
+            )
+
         rag_manager = get_rag_manager()
         indexed_books = rag_manager.index_directory(epub_dir, chunk_size, overlap_size)
-        
+
         return {
             "status": "success",
             "message": f"{len(indexed_books)}冊の書籍をインデックス化しました",
-            "indexed_books": indexed_books
+            "indexed_books": indexed_books,
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -132,64 +136,53 @@ def search_books(request: SearchRequest):
     try:
         if not request.query.strip():
             raise HTTPException(status_code=400, detail="検索クエリが空です")
-        
+
         settings = get_epub_settings()
         top_k = request.top_k or settings["search_top_k"]
         min_score = request.min_score or settings["min_similarity_score"]
-        
+
         rag_manager = get_rag_manager()
-        
+
         if request.book_name:
             # 特定の書籍で検索
             results = rag_manager.search_in_book(
-                request.book_name,
-                request.query,
-                top_k,
-                min_score
+                request.book_name, request.query, top_k, min_score
             )
-            
+
             formatted_results = []
             for text, metadata, score in results:
-                formatted_results.append({
-                    "text": text,
-                    "metadata": metadata,
-                    "score": score
-                })
-            
+                formatted_results.append(
+                    {"text": text, "metadata": metadata, "score": score}
+                )
+
             return {
                 "query": request.query,
                 "book_name": request.book_name,
                 "results": formatted_results,
-                "total_results": len(formatted_results)
+                "total_results": len(formatted_results),
             }
         else:
             # 全書籍で検索
-            all_results = rag_manager.search_all_books(
-                request.query,
-                top_k,
-                min_score
-            )
-            
+            all_results = rag_manager.search_all_books(request.query, top_k, min_score)
+
             formatted_results = {}
             total_count = 0
-            
+
             for book_name, book_results in all_results.items():
                 formatted_book_results = []
                 for text, metadata, score in book_results:
-                    formatted_book_results.append({
-                        "text": text,
-                        "metadata": metadata,
-                        "score": score
-                    })
+                    formatted_book_results.append(
+                        {"text": text, "metadata": metadata, "score": score}
+                    )
                 formatted_results[book_name] = formatted_book_results
                 total_count += len(formatted_book_results)
-            
+
             return {
                 "query": request.query,
                 "results": formatted_results,
-                "total_results": total_count
+                "total_results": total_count,
             }
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -203,15 +196,15 @@ def delete_book_index(book_name: str):
     try:
         rag_manager = get_rag_manager()
         success = rag_manager.delete_book_index(book_name)
-        
+
         if success:
             return {
                 "status": "success",
-                "message": f"書籍「{book_name}」のインデックスを削除しました"
+                "message": f"書籍「{book_name}」のインデックスを削除しました",
             }
         else:
             raise HTTPException(status_code=404, detail="書籍が見つかりません")
-            
+
     except HTTPException:
         raise
     except Exception as e:
@@ -221,18 +214,15 @@ def delete_book_index(book_name: str):
 
 @router.get("/search/format")
 def format_search_results(
-    query: str,
-    book_name: Optional[str] = None,
-    top_k: int = 5,
-    min_score: float = 0.1
+    query: str, book_name: Optional[str] = None, top_k: int = 5, min_score: float = 0.1
 ):
     """検索結果をフォーマットして返す（変数展開用）"""
     try:
         if not query.strip():
             return {"formatted_text": "検索クエリが空です。"}
-        
+
         rag_manager = get_rag_manager()
-        
+
         if book_name:
             results = rag_manager.search_in_book(book_name, query, top_k, min_score)
         else:
@@ -243,15 +233,15 @@ def format_search_results(
                 results.extend(book_results)
             results.sort(key=lambda x: x[2], reverse=True)
             results = results[:top_k]
-        
+
         formatted_text = rag_manager.format_search_results(results)
-        
+
         return {
             "query": query,
             "formatted_text": formatted_text,
-            "result_count": len(results)
+            "result_count": len(results),
         }
-        
+
     except Exception as e:
         _logger.error(f"フォーマット済み検索エラー: {e}")
         return {"formatted_text": f"検索エラー: {e}"}
@@ -263,21 +253,18 @@ def health_check():
     try:
         settings = get_epub_settings()
         available_books = []
-        
+
         if EPUB_CACHE_DIR.exists():
             rag_manager = get_rag_manager()
             available_books = rag_manager.get_available_books()
-        
+
         return {
             "status": "healthy",
             "epub_directory": settings["epub_directory"],
             "cache_directory": str(EPUB_CACHE_DIR),
             "available_books_count": len(available_books),
-            "embedding_model": settings["embedding_model"]
+            "embedding_model": settings["embedding_model"],
         }
     except Exception as e:
         _logger.error(f"ヘルスチェックエラー: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+        return {"status": "error", "error": str(e)}

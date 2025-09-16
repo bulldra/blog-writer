@@ -90,60 +90,60 @@ def build_bullets_prompt(req: BulletsParams, bullets: List[str]) -> str:
 
 def generate_rag_query(prompt: str, title: Optional[str] = None) -> str:
     """プロンプトからRAG検索用のクエリを生成
-    
+
     Args:
         prompt: 生成プロンプト
         title: タイトル（オプション）
-        
+
     Returns:
         RAG検索用のクエリ文字列
     """
     # プロンプトから検索に有用なキーワードを抽出
     search_terms = []
-    
+
     # タイトルがある場合は追加
     if title:
         search_terms.append(title)
-    
+
     # プロンプトから重要な名詞や概念を抽出（簡易的な実装）
-    import_terms = re.findall(r'[一-龯ぁ-ゟァ-ヾ]+', prompt)
+    import_terms = re.findall(r"[一-龯ぁ-ゟァ-ヾ]+", prompt)
     meaningful_terms = [term for term in import_terms if len(term) >= 2]
-    
+
     # 重複を除去して上位5つまで
     unique_terms = list(dict.fromkeys(meaningful_terms))[:5]
     search_terms.extend(unique_terms)
-    
+
     # 検索クエリとして結合
     query = " ".join(search_terms)
-    
+
     # 最大100文字に制限
     if len(query) > 100:
         query = query[:100]
-    
+
     return query.strip()
 
 
 def inject_rag_context(prompt: str, rag_context: str) -> str:
     """プロンプトにRAGコンテキストを注入
-    
+
     Args:
         prompt: 元のプロンプト
         rag_context: RAG検索結果のコンテキスト
-        
+
     Returns:
         RAGコンテキストが注入されたプロンプト
     """
     if not rag_context or rag_context.strip() == "関連する情報が見つかりませんでした。":
         return prompt
-    
+
     # RAGコンテキストをプロンプトに挿入
     rag_section = f"\n\n[参考情報]\n{rag_context}\n\n上記の参考情報も踏まえて、"
-    
+
     # プロンプトの最初の指示文の後に挿入
     if "してください。" in prompt:
         parts = prompt.split("してください。", 1)
         if len(parts) == 2:
             return parts[0] + "してください。" + rag_section + parts[1]
-    
+
     # デフォルトでは先頭に追加
     return rag_section + prompt
