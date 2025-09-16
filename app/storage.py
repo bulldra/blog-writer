@@ -803,8 +803,8 @@ def get_notion_settings() -> Dict[str, Any]:
 
 def save_notion_settings(
     command: str = "npx",
-    args: List[str] = None,
-    env: Dict[str, str] = None,
+    args: Optional[List[str]] = None,
+    env: Optional[Dict[str, str]] = None,
     enabled: bool = False,
     default_parent_id: str = "",
 ) -> None:

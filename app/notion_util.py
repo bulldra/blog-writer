@@ -1,12 +1,10 @@
 """Notion MCP client utilities for blog writer."""
 
-import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional
 
-import httpx
-from mcp import ClientSession, types
+from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 logger = logging.getLogger(__name__)
@@ -17,7 +15,7 @@ class NotionMCPClient:
 
     def __init__(self, config: Dict[str, Any]):
         """Initialize the Notion MCP client.
-        
+
         Args:
             config: Dictionary containing MCP server configuration
         """
@@ -63,10 +61,10 @@ class NotionMCPClient:
 
     async def list_pages(self, limit: int = 10) -> List[Dict[str, Any]]:
         """List pages from Notion.
-        
+
         Args:
             limit: Maximum number of pages to retrieve
-            
+
         Returns:
             List of page information dictionaries
         """
@@ -75,16 +73,14 @@ class NotionMCPClient:
 
         try:
             # Notion ページ一覧取得ツールを呼び出し
-            result = await self._session.call_tool(
-                "search_pages", {"limit": limit}
-            )
-            
+            result = await self._session.call_tool("search_pages", {"limit": limit})
+
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
-                if hasattr(content_item, 'text'):
+                if hasattr(content_item, "text"):
                     pages_data = json.loads(content_item.text)
                     return pages_data.get("results", [])
-            
+
             return []
 
         except Exception as e:
@@ -93,10 +89,10 @@ class NotionMCPClient:
 
     async def get_page_content(self, page_id: str) -> Optional[Dict[str, Any]]:
         """Get content of a specific Notion page.
-        
+
         Args:
             page_id: Notion page ID
-            
+
         Returns:
             Page content dictionary or None if failed
         """
@@ -105,15 +101,13 @@ class NotionMCPClient:
 
         try:
             # Notion ページ内容取得ツールを呼び出し
-            result = await self._session.call_tool(
-                "get_page", {"page_id": page_id}
-            )
-            
+            result = await self._session.call_tool("get_page", {"page_id": page_id})
+
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
-                if hasattr(content_item, 'text'):
+                if hasattr(content_item, "text"):
                     return json.loads(content_item.text)
-            
+
             return None
 
         except Exception as e:
@@ -122,11 +116,11 @@ class NotionMCPClient:
 
     async def search_pages(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search pages in Notion.
-        
+
         Args:
             query: Search query string
             limit: Maximum number of results
-            
+
         Returns:
             List of matching page information
         """
@@ -138,13 +132,13 @@ class NotionMCPClient:
             result = await self._session.call_tool(
                 "search_pages", {"query": query, "limit": limit}
             )
-            
+
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
-                if hasattr(content_item, 'text'):
+                if hasattr(content_item, "text"):
                     search_data = json.loads(content_item.text)
                     return search_data.get("results", [])
-            
+
             return []
 
         except Exception as e:
@@ -152,18 +146,15 @@ class NotionMCPClient:
             return []
 
     async def create_page(
-        self, 
-        title: str, 
-        content: str, 
-        parent_id: Optional[str] = None
+        self, title: str, content: str, parent_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """Create a new page in Notion.
-        
+
         Args:
             title: Page title
             content: Page content (markdown format)
             parent_id: Parent page ID (optional)
-            
+
         Returns:
             Created page information or None if failed
         """
@@ -180,15 +171,13 @@ class NotionMCPClient:
                 create_params["parent_id"] = parent_id
 
             # Notion ページ作成ツールを呼び出し
-            result = await self._session.call_tool(
-                "create_page", create_params
-            )
-            
+            result = await self._session.call_tool("create_page", create_params)
+
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
-                if hasattr(content_item, 'text'):
+                if hasattr(content_item, "text"):
                     return json.loads(content_item.text)
-            
+
             return None
 
         except Exception as e:
@@ -198,7 +187,7 @@ class NotionMCPClient:
 
 def get_default_notion_config() -> Dict[str, Any]:
     """Get default Notion MCP configuration.
-    
+
     Returns:
         Default configuration dictionary
     """
@@ -214,17 +203,17 @@ def get_default_notion_config() -> Dict[str, Any]:
 
 async def test_notion_connection(config: Dict[str, Any]) -> bool:
     """Test connection to Notion MCP server.
-    
+
     Args:
         config: Notion MCP configuration
-        
+
     Returns:
         True if connection successful, False otherwise
     """
     try:
         async with NotionMCPClient(config) as client:
             # 簡単なテスト：ページ一覧を取得
-            pages = await client.list_pages(limit=1)
+            await client.list_pages(limit=1)
             return True
     except Exception as e:
         logger.error(f"Notion connection test failed: {e}")
@@ -233,10 +222,10 @@ async def test_notion_connection(config: Dict[str, Any]) -> bool:
 
 def format_notion_page_for_context(page: Dict[str, Any]) -> str:
     """Format Notion page data for use as context in article generation.
-    
+
     Args:
         page: Page data from Notion
-        
+
     Returns:
         Formatted string for context
     """
@@ -245,44 +234,42 @@ def format_notion_page_for_context(page: Dict[str, Any]) -> str:
         page_title = title[0]["plain_text"]
     else:
         page_title = "Untitled"
-    
+
     # ページのプロパティを取得
     properties = page.get("properties", {})
     formatted_props = []
-    
+
     for prop_name, prop_data in properties.items():
         if prop_name == "title":
             continue
-            
+
         prop_type = prop_data.get("type", "")
         prop_value = ""
-        
+
         if prop_type == "rich_text" and prop_data.get("rich_text"):
-            prop_value = " ".join([
-                item.get("plain_text", "") 
-                for item in prop_data["rich_text"]
-            ])
+            prop_value = " ".join(
+                [item.get("plain_text", "") for item in prop_data["rich_text"]]
+            )
         elif prop_type == "select" and prop_data.get("select"):
             prop_value = prop_data["select"].get("name", "")
         elif prop_type == "multi_select" and prop_data.get("multi_select"):
-            prop_value = ", ".join([
-                item.get("name", "") 
-                for item in prop_data["multi_select"]
-            ])
+            prop_value = ", ".join(
+                [item.get("name", "") for item in prop_data["multi_select"]]
+            )
         elif prop_type == "date" and prop_data.get("date"):
             prop_value = prop_data["date"].get("start", "")
-        
+
         if prop_value:
             formatted_props.append(f"{prop_name}: {prop_value}")
-    
+
     result = f"## {page_title}\n"
     if formatted_props:
         result += "\n### プロパティ\n"
         for prop in formatted_props:
             result += f"- {prop}\n"
-    
+
     # ページのコンテンツがある場合は追加
     if "content" in page and page["content"]:
         result += f"\n### コンテンツ\n{page['content']}\n"
-    
+
     return result

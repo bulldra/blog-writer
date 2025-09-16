@@ -183,3 +183,52 @@ def test_search_pages_validation(client):
     search_data = {"limit": 10}
     response = client.post("/api/notion/search", json=search_data)
     assert response.status_code == 422  # Validation error
+
+
+def test_publish_article_disabled(client):
+    """Test publishing article when Notion is disabled."""
+    # Disable Notion
+    settings_data = {
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-notion"],
+        "env": {"NOTION_API_KEY": ""},
+        "enabled": False,
+        "default_parent_id": ""
+    }
+    client.post("/api/notion/settings", json=settings_data)
+    
+    article_data = {
+        "title": "Test Article",
+        "content": "# Test Article\n\nThis is a test article content.",
+        "parent_id": None
+    }
+    response = client.post("/api/notion/publish-article", json=article_data)
+    assert response.status_code == 400
+    assert "disabled" in response.json()["detail"]
+
+
+def test_publish_article_validation(client):
+    """Test publish article request validation."""
+    # Enable Notion with API key
+    settings_data = {
+        "command": "npx",
+        "args": ["@modelcontextprotocol/server-notion"],
+        "env": {"NOTION_API_KEY": "test_key"},
+        "enabled": True,
+        "default_parent_id": "default_parent"
+    }
+    client.post("/api/notion/settings", json=settings_data)
+    
+    # Test with missing title
+    article_data = {
+        "content": "Test content"
+    }
+    response = client.post("/api/notion/publish-article", json=article_data)
+    assert response.status_code == 422  # Validation error
+    
+    # Test with missing content
+    article_data = {
+        "title": "Test Title"
+    }
+    response = client.post("/api/notion/publish-article", json=article_data)
+    assert response.status_code == 422  # Validation error
