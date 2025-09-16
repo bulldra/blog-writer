@@ -4,11 +4,13 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.rag_util import RAGManager
 from app.storage import EPUB_CACHE_DIR, get_epub_settings, save_epub_settings
+from app.models import EpubHighlight, get_db, init_db
 
 router = APIRouter()
 _logger = logging.getLogger(__name__)
@@ -49,6 +51,29 @@ class SearchRequest(BaseModel):
     book_name: Optional[str] = None
     top_k: Optional[int] = None
     min_score: Optional[float] = None
+
+
+class HighlightCreate(BaseModel):
+    book_title: str
+    chapter_title: str
+    highlighted_text: str
+    context_before: str = ""
+    context_after: str = ""
+    position_start: int
+    position_end: int
+
+
+class HighlightUpdate(BaseModel):
+    selected_for_context: Optional[bool] = None
+
+
+class ChapterContent(BaseModel):
+    chapter_title: str
+    content: str
+
+
+# データベースを初期化
+init_db()
 
 
 @router.get("/settings")
@@ -281,3 +306,201 @@ def health_check():
             "status": "error",
             "error": str(e)
         }
+
+
+@router.get("/books/{book_name}/chapters")
+def get_book_chapters(book_name: str):
+    """書籍のチャプター一覧を取得"""
+    try:
+        from app.epub_util import extract_text_from_epub, get_epub_files
+        
+        settings = get_epub_settings()
+        epub_directory = settings["epub_directory"]
+        
+        if not epub_directory:
+            raise HTTPException(status_code=400, detail="EPUBディレクトリが設定されていません")
+        
+        epub_dir = Path(epub_directory)
+        if not epub_dir.exists():
+            raise HTTPException(status_code=404, detail=f"ディレクトリが見つかりません: {epub_directory}")
+        
+        # 該当する書籍ファイルを検索
+        epub_files = get_epub_files(epub_dir)
+        target_file = None
+        
+        for epub_file in epub_files:
+            try:
+                book_title, _ = extract_text_from_epub(epub_file)
+                if book_title == book_name:
+                    target_file = epub_file
+                    break
+            except:
+                continue
+        
+        if not target_file:
+            raise HTTPException(status_code=404, detail="書籍が見つかりません")
+        
+        # チャプターコンテンツを取得
+        _, chapters = extract_text_from_epub(target_file)
+        
+        chapter_list = []
+        for chapter_title, content in chapters.items():
+            chapter_list.append({
+                "chapter_title": chapter_title,
+                "content": content
+            })
+        
+        return {
+            "book_title": book_name,
+            "chapters": chapter_list
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        _logger.error(f"チャプター取得エラー: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/highlights")
+def create_highlight(highlight: HighlightCreate, db: Session = Depends(get_db)):
+    """ハイライトを作成"""
+    try:
+        db_highlight = EpubHighlight(
+            book_title=highlight.book_title,
+            chapter_title=highlight.chapter_title,
+            highlighted_text=highlight.highlighted_text,
+            context_before=highlight.context_before,
+            context_after=highlight.context_after,
+            position_start=highlight.position_start,
+            position_end=highlight.position_end
+        )
+        db.add(db_highlight)
+        db.commit()
+        db.refresh(db_highlight)
+        
+        return {
+            "id": db_highlight.id,
+            "message": "ハイライトを作成しました"
+        }
+    except Exception as e:
+        _logger.error(f"ハイライト作成エラー: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/highlights")
+def get_highlights(
+    book_title: Optional[str] = None,
+    selected_for_context: Optional[bool] = None,
+    db: Session = Depends(get_db)
+):
+    """ハイライト一覧を取得"""
+    try:
+        query = db.query(EpubHighlight)
+        
+        if book_title:
+            query = query.filter(EpubHighlight.book_title == book_title)
+        
+        if selected_for_context is not None:
+            query = query.filter(EpubHighlight.selected_for_context == selected_for_context)
+        
+        highlights = query.order_by(EpubHighlight.created_at.desc()).all()
+        
+        return {
+            "highlights": [
+                {
+                    "id": h.id,
+                    "book_title": h.book_title,
+                    "chapter_title": h.chapter_title,
+                    "highlighted_text": h.highlighted_text,
+                    "context_before": h.context_before,
+                    "context_after": h.context_after,
+                    "position_start": h.position_start,
+                    "position_end": h.position_end,
+                    "selected_for_context": h.selected_for_context,
+                    "created_at": h.created_at.isoformat()
+                }
+                for h in highlights
+            ]
+        }
+    except Exception as e:
+        _logger.error(f"ハイライト取得エラー: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/highlights/{highlight_id}")
+def update_highlight(
+    highlight_id: int,
+    highlight_update: HighlightUpdate,
+    db: Session = Depends(get_db)
+):
+    """ハイライトを更新"""
+    try:
+        highlight = db.query(EpubHighlight).filter(EpubHighlight.id == highlight_id).first()
+        
+        if not highlight:
+            raise HTTPException(status_code=404, detail="ハイライトが見つかりません")
+        
+        if highlight_update.selected_for_context is not None:
+            highlight.selected_for_context = highlight_update.selected_for_context
+        
+        db.commit()
+        
+        return {"message": "ハイライトを更新しました"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        _logger.error(f"ハイライト更新エラー: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/highlights/{highlight_id}")
+def delete_highlight(highlight_id: int, db: Session = Depends(get_db)):
+    """ハイライトを削除"""
+    try:
+        highlight = db.query(EpubHighlight).filter(EpubHighlight.id == highlight_id).first()
+        
+        if not highlight:
+            raise HTTPException(status_code=404, detail="ハイライトが見つかりません")
+        
+        db.delete(highlight)
+        db.commit()
+        
+        return {"message": "ハイライトを削除しました"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        _logger.error(f"ハイライト削除エラー: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/highlights/context")
+def get_selected_highlights_for_context(db: Session = Depends(get_db)):
+    """コンテキストに選択されたハイライトを取得"""
+    try:
+        highlights = db.query(EpubHighlight).filter(
+            EpubHighlight.selected_for_context == True
+        ).order_by(EpubHighlight.created_at.desc()).all()
+        
+        formatted_context = []
+        for h in highlights:
+            formatted_context.append(
+                f"[{h.book_title} - {h.chapter_title}]\n{h.highlighted_text}"
+            )
+        
+        return {
+            "highlights": [
+                {
+                    "id": h.id,
+                    "book_title": h.book_title,
+                    "chapter_title": h.chapter_title,
+                    "highlighted_text": h.highlighted_text,
+                    "created_at": h.created_at.isoformat()
+                }
+                for h in highlights
+            ],
+            "formatted_context": "\n\n".join(formatted_context)
+        }
+    except Exception as e:
+        _logger.error(f"コンテキスト取得エラー: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

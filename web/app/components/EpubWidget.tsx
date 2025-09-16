@@ -44,20 +44,40 @@ export function EpubWidget({ onResultChange, isEnabled = true }: EpubWidgetProps
   });
   const [showSettings, setShowSettings] = useState(false);
   const [isLoadingBooks, setIsLoadingBooks] = useState(false);
+  const [selectedHighlights, setSelectedHighlights] = useState<any[]>([]);
+  const [useHighlightsContext, setUseHighlightsContext] = useState(false);
 
   // 設定を読み込み
   useEffect(() => {
     loadSettings();
     loadBooks();
+    loadSelectedHighlights();
   }, []);
 
   // 検索結果が変更されたときに親に通知
   useEffect(() => {
-    if (onResultChange && searchResults.length > 0) {
-      const formatted = formatSearchResults(searchResults);
-      onResultChange(formatted);
+    if (onResultChange) {
+      let formattedResult = '';
+      
+      if (useHighlightsContext && selectedHighlights.length > 0) {
+        // ハイライトコンテキストを使用
+        const highlightContext = selectedHighlights.map(h => 
+          `[${h.book_title} - ${h.chapter_title}]\n${h.highlighted_text}`
+        ).join('\n\n');
+        
+        if (searchResults.length > 0) {
+          const searchContext = formatSearchResults(searchResults);
+          formattedResult = `【ハイライト情報】\n${highlightContext}\n\n【検索結果】\n${searchContext}`;
+        } else {
+          formattedResult = `【ハイライト情報】\n${highlightContext}`;
+        }
+      } else if (searchResults.length > 0) {
+        formattedResult = formatSearchResults(searchResults);
+      }
+      
+      onResultChange(formattedResult);
     }
-  }, [searchResults, onResultChange]);
+  }, [searchResults, selectedHighlights, useHighlightsContext, onResultChange]);
 
   const loadSettings = async () => {
     try {
@@ -103,6 +123,18 @@ export function EpubWidget({ onResultChange, isEnabled = true }: EpubWidgetProps
       console.error('書籍一覧の読み込みに失敗:', error);
     } finally {
       setIsLoadingBooks(false);
+    }
+  };
+
+  const loadSelectedHighlights = async () => {
+    try {
+      const response = await fetch('/api/epub/highlights/context');
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedHighlights(data.highlights || []);
+      }
+    } catch (error) {
+      console.error('ハイライト読み込みに失敗:', error);
     }
   };
 
@@ -263,6 +295,47 @@ export function EpubWidget({ onResultChange, isEnabled = true }: EpubWidgetProps
             </div>
           </div>
         )}
+
+        <div className="highlights-context-panel">
+          <div className="form-group">
+            <label className="context-checkbox">
+              <input
+                type="checkbox"
+                checked={useHighlightsContext}
+                onChange={(e) => setUseHighlightsContext(e.target.checked)}
+              />
+              ハイライトをコンテキストに使用 ({selectedHighlights.length}件選択中)
+            </label>
+            <button 
+              onClick={loadSelectedHighlights} 
+              className="btn-secondary btn-sm"
+              style={{ marginLeft: '8px' }}
+            >
+              🔄 更新
+            </button>
+          </div>
+          
+          {useHighlightsContext && selectedHighlights.length > 0 && (
+            <div className="selected-highlights-preview">
+              <h5>選択されたハイライト:</h5>
+              <div className="highlights-list-compact">
+                {selectedHighlights.slice(0, 3).map((highlight, i) => (
+                  <div key={highlight.id} className="highlight-preview">
+                    <span className="highlight-book">{highlight.book_title}</span>
+                    <span className="highlight-text-preview">
+                      {highlight.highlighted_text.slice(0, 60)}...
+                    </span>
+                  </div>
+                ))}
+                {selectedHighlights.length > 3 && (
+                  <div className="more-highlights">
+                    +{selectedHighlights.length - 3}件のハイライト
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="search-panel">
           <div className="form-group">
@@ -517,6 +590,76 @@ export function EpubWidget({ onResultChange, isEnabled = true }: EpubWidgetProps
           font-weight: 500;
           font-size: 14px;
           color: #495057;
+        }
+        
+        .highlights-context-panel {
+          background: #e3f2fd;
+          padding: 12px;
+          border-radius: 6px;
+          margin-bottom: 16px;
+          border: 1px solid #bbdefb;
+        }
+        
+        .context-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 14px;
+          color: #555;
+          cursor: pointer;
+          margin-bottom: 0;
+        }
+        
+        .context-checkbox input {
+          cursor: pointer;
+        }
+        
+        .selected-highlights-preview {
+          margin-top: 12px;
+        }
+        
+        .selected-highlights-preview h5 {
+          margin: 0 0 8px 0;
+          font-size: 13px;
+          color: #333;
+        }
+        
+        .highlights-list-compact {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        
+        .highlight-preview {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          padding: 6px;
+          background: white;
+          border-radius: 4px;
+          border: 1px solid #ddd;
+        }
+        
+        .highlight-book {
+          font-size: 11px;
+          color: #666;
+          font-weight: 500;
+        }
+        
+        .highlight-text-preview {
+          font-size: 12px;
+          color: #333;
+          font-style: italic;
+        }
+        
+        .more-highlights {
+          padding: 6px;
+          text-align: center;
+          font-size: 12px;
+          color: #666;
+          background: #f8f9fa;
+          border-radius: 4px;
+          border: 1px solid #ddd;
         }
       `}</style>
     </div>

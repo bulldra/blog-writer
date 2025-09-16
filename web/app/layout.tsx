@@ -31,6 +31,14 @@ export default function RootLayout({
 											Writer
 										</span>
 									</a>
+									<a href="/epub-reader" className="nav-item">
+										<span className="nav-icon" aria-hidden>
+											📖
+										</span>
+										<span className="nav-label">
+											EPUB Reader
+										</span>
+									</a>
 									<a href="/phrases" className="nav-item">
 										<span className="nav-icon" aria-hidden>
 											🔖
