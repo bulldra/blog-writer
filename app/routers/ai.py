@@ -1,7 +1,7 @@
 import json
 import logging as _logging
 import os
-from typing import Any, AsyncGenerator, List, Literal, Mapping, Optional, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Literal, Mapping, Optional, Tuple
 
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -11,14 +11,15 @@ from google.genai import types as genai_types
 from pydantic import BaseModel
 
 from app.ai_utils import (
-    apply_prompt_template, 
-    build_bullets_prompt, 
-    extract_text, 
+    apply_prompt_template,
+    build_bullets_prompt,
+    extract_text,
     generate_rag_query,
-    inject_rag_context
+    inject_rag_context,
 )
 from app.security import decrypt_text, encrypt_text, is_url_allowed
 from app.storage import get_ai_settings, save_ai_settings
+from app.widget_util import process_widget_sync
 
 router = APIRouter()
 
@@ -47,6 +48,7 @@ class GenerateRequest(BaseModel):
     enable_rag: bool = False
     rag_book_name: Optional[str] = None
     title: Optional[str] = None
+    notion_context: Optional[str] = None
 
 
 @router.get("/settings")
@@ -162,16 +164,19 @@ async def generate(req: GenerateRequest):
     if req.enable_rag:
         try:
             from app.routers.epub import get_rag_manager
+
             rag_manager = get_rag_manager()
-            
+
             # 検索クエリを生成
             search_query = generate_rag_query(req.prompt, req.title)
             _logger.info(f"RAG検索クエリ: {search_query}")
-            
+
             if search_query.strip():
                 if req.rag_book_name:
                     # 特定の書籍で検索
-                    results = rag_manager.search_in_book(req.rag_book_name, search_query, 5, 0.1)
+                    results = rag_manager.search_in_book(
+                        req.rag_book_name, search_query, 5, 0.1
+                    )
                     rag_context = rag_manager.format_search_results(results)
                 else:
                     # 全書籍で検索
@@ -182,8 +187,10 @@ async def generate(req: GenerateRequest):
                         combined_results.extend(book_results)
                     # スコア順でソートして上位5件
                     combined_results.sort(key=lambda x: x[2], reverse=True)
-                    rag_context = rag_manager.format_search_results(combined_results[:5])
-                
+                    rag_context = rag_manager.format_search_results(
+                        combined_results[:5]
+                    )
+
                 _logger.info(f"RAG検索結果取得: {len(rag_context)}文字")
         except Exception as e:
             _logger.warning(f"RAG検索エラー: {e}")
@@ -191,7 +198,7 @@ async def generate(req: GenerateRequest):
 
     # プロンプトの基本処理
     base_prompt = (req.prompt or "")[:max_len]
-    
+
     # RAGコンテキストを注入
     if rag_context:
         base_prompt = inject_rag_context(base_prompt, rag_context)
@@ -301,6 +308,8 @@ class BulletsRequest(BaseModel):
     prompt_template: Optional[str] = None
     article_type: Optional[Literal["url", "note", "review"]] = None
     extra_context: Optional[Mapping[str, str]] = None
+    notion_context: Optional[str] = None
+    widgets: Optional[List[Dict[str, Any]]] = None
 
 
 _apply_prompt_template = apply_prompt_template
@@ -325,6 +334,38 @@ def _sanitize_bullets_request(req: BulletsRequest) -> BulletsRequest:
     return req
 
 
+def _process_widgets(req: BulletsRequest) -> Optional[str]:
+    """Process widgets and return combined context.
+    
+    Args:
+        req: Request containing widget configurations
+        
+    Returns:
+        Combined context from all widgets or None if no widgets
+    """
+    if not req.widgets:
+        return None
+    
+    context_parts = []
+    
+    for widget in req.widgets:
+        widget_type = widget.get("type", "")
+        widget_data = widget.get("data", {})
+        
+        try:
+            context = process_widget_sync(widget_type, widget_data)
+            if context:
+                context_parts.append(f"## {widget_type.title()} Widget Context\n{context}")
+        except Exception as e:
+            _logger.error(f"Error processing {widget_type} widget: {e}")
+            continue
+    
+    if context_parts:
+        return "\n\n---\n\n".join(context_parts)
+    
+    return None
+
+
 @router.post("/from-bullets")
 async def from_bullets(req: BulletsRequest):
     row = get_ai_settings()
@@ -334,6 +375,15 @@ async def from_bullets(req: BulletsRequest):
     max_len = int(row.get("max_prompt_len", 32768))
 
     req2 = _sanitize_bullets_request(req)
+    
+    # Process widgets first to get additional context
+    widget_context = _process_widgets(req2)
+    if widget_context and not req2.notion_context:
+        req2 = req2.model_copy(update={"notion_context": widget_context})
+    elif widget_context and req2.notion_context:
+        combined_context = f"{req2.notion_context}\n\n---\n\n{widget_context}"
+        req2 = req2.model_copy(update={"notion_context": combined_context})
+    
     bullets = [b.strip() for b in (req2.bullets or []) if b and b.strip()]
     prompt = _build_bullets_prompt(req2, bullets)
 
@@ -462,6 +512,15 @@ async def from_bullets_stream(req: BulletsRequest):
     max_len = int(row.get("max_prompt_len", 32768))
 
     req2 = _sanitize_bullets_request(req)
+    
+    # Process widgets first to get additional context
+    widget_context = _process_widgets(req2)
+    if widget_context and not req2.notion_context:
+        req2 = req2.model_copy(update={"notion_context": widget_context})
+    elif widget_context and req2.notion_context:
+        combined_context = f"{req2.notion_context}\n\n---\n\n{widget_context}"
+        req2 = req2.model_copy(update={"notion_context": combined_context})
+    
     bullets = [b.strip() for b in (req2.bullets or []) if b and b.strip()]
     prompt = _build_bullets_prompt(req2, bullets)
 
@@ -654,6 +713,15 @@ async def from_bullets_stream(req: BulletsRequest):
 async def from_bullets_prompt(req: BulletsRequest):
     """最終的に使用するプロンプトを返す。モデル呼び出しは行わない。"""
     req2 = _sanitize_bullets_request(req)
+    
+    # Process widgets first to get additional context
+    widget_context = _process_widgets(req2)
+    if widget_context and not req2.notion_context:
+        req2 = req2.model_copy(update={"notion_context": widget_context})
+    elif widget_context and req2.notion_context:
+        combined_context = f"{req2.notion_context}\n\n---\n\n{widget_context}"
+        req2 = req2.model_copy(update={"notion_context": combined_context})
+    
     bullets = [b.strip() for b in (req2.bullets or []) if b and b.strip()]
     prompt = _build_bullets_prompt(req2, bullets)
     if req2.url_context:
