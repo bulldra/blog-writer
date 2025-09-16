@@ -25,16 +25,10 @@ def test_get_available_widgets():
     """利用可能なウィジェット一覧の取得をテスト"""
     widgets = get_available_widgets()
     assert isinstance(widgets, list)
-    assert len(widgets) == 5
+    assert len(widgets) == 6
 
     widget_ids = [w["id"] for w in widgets]
-    assert set(widget_ids) == {
-        "properties",
-        "url_context",
-        "kindle",
-        "past_posts",
-        "epub",
-    }
+    assert set(widget_ids) == {"properties", "url_context", "kindle", "past_posts", "epub", "notion"}
 
     for widget in widgets:
         assert "id" in widget
