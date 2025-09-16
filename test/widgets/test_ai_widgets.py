@@ -1,16 +1,5 @@
 """Tests for AI integration with widgets."""
 
-import pytest
-from fastapi.testclient import TestClient
-from app.main import create_app
-
-
-@pytest.fixture
-def client():
-    """Create test client."""
-    app = create_app()
-    return TestClient(app)
-
 
 def test_from_bullets_with_widgets(client):
     """Test from-bullets endpoint with widget integration."""
@@ -26,12 +15,12 @@ def test_from_bullets_with_widgets(client):
                 "data": {
                     "page_ids": ["test_page_id"],
                     "search_query": "",
-                    "max_pages": 1
-                }
+                    "max_pages": 1,
+                },
             }
-        ]
+        ],
     }
-    
+
     # This will likely fail due to missing AI configuration, but we test the structure
     response = client.post("/api/ai/from-bullets", json=request_data)
     # The API should work normally, even if widgets fail
@@ -48,12 +37,12 @@ def test_from_bullets_with_invalid_widgets(client):
                 "data": {
                     "page_ids": [],  # Invalid: no page_ids or search_query
                     "search_query": "",
-                    "max_pages": 1
-                }
+                    "max_pages": 1,
+                },
             }
-        ]
+        ],
     }
-    
+
     response = client.post("/api/ai/from-bullets", json=request_data)
     # Should handle invalid widget gracefully
     assert response.status_code == 200
@@ -66,16 +55,16 @@ def test_from_bullets_prompt_with_widgets(client):
         "title": "Test Article",
         "widgets": [
             {
-                "type": "notion", 
+                "type": "notion",
                 "data": {
                     "page_ids": ["test_page_id"],
                     "search_query": "",
-                    "max_pages": 1
-                }
+                    "max_pages": 1,
+                },
             }
-        ]
+        ],
     }
-    
+
     response = client.post("/api/ai/from-bullets/prompt", json=request_data)
     # Prompt generation should work even if widgets fail
     assert response.status_code in [200, 400, 422, 500]
@@ -86,9 +75,9 @@ def test_from_bullets_with_notion_context(client):
     request_data = {
         "bullets": ["Test bullet point"],
         "title": "Test Article",
-        "notion_context": "## Test Notion Page\n\nThis is test context from Notion."
+        "notion_context": "## Test Notion Page\n\nThis is test context from Notion.",
     }
-    
+
     response = client.post("/api/ai/from-bullets", json=request_data)
     # Should handle notion_context parameter
     assert response.status_code == 200
@@ -101,19 +90,12 @@ def test_from_bullets_with_multiple_widgets(client):
         "widgets": [
             {
                 "type": "notion",
-                "data": {
-                    "page_ids": ["page1"],
-                    "search_query": "",
-                    "max_pages": 1
-                }
+                "data": {"page_ids": ["page1"], "search_query": "", "max_pages": 1},
             },
-            {
-                "type": "unknown_widget",
-                "data": {"test": "data"}
-            }
-        ]
+            {"type": "unknown_widget", "data": {"test": "data"}},
+        ],
     }
-    
+
     response = client.post("/api/ai/from-bullets", json=request_data)
     # Should handle mixed widget types gracefully
     assert response.status_code == 200
@@ -121,11 +103,8 @@ def test_from_bullets_with_multiple_widgets(client):
 
 def test_from_bullets_empty_widgets(client):
     """Test from-bullets endpoint with empty widgets list."""
-    request_data = {
-        "bullets": ["Test bullet point"],
-        "widgets": []
-    }
-    
+    request_data = {"bullets": ["Test bullet point"], "widgets": []}
+
     response = client.post("/api/ai/from-bullets", json=request_data)
     # Empty widgets should be handled gracefully
     assert response.status_code == 200
@@ -133,11 +112,8 @@ def test_from_bullets_empty_widgets(client):
 
 def test_from_bullets_no_widgets(client):
     """Test from-bullets endpoint without widgets parameter."""
-    request_data = {
-        "bullets": ["Test bullet point"],
-        "title": "Test Article"
-    }
-    
+    request_data = {"bullets": ["Test bullet point"], "title": "Test Article"}
+
     response = client.post("/api/ai/from-bullets", json=request_data)
     # No widgets should work normally
     assert response.status_code == 200

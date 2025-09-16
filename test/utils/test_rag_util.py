@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import Mock, patch
+
 from app.rag_util import RAGManager
 
 
@@ -114,7 +115,7 @@ def test_delete_book_index(mock_exists, mock_unlink):
     result = rag_manager.delete_book_index("テスト本")
 
     assert result is True
-    assert mock_unlink.call_count >= 2  # .faiss と .pkl ファイル
+    assert mock_unlink.call_count >= 1  # .pkl ファイル
 
 
 def test_search_all_books_empty():

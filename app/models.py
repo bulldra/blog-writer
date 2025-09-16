@@ -1,18 +1,28 @@
 """データベースモデル定義"""
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from typing import TYPE_CHECKING, Generator
 
-Base = declarative_base()
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, create_engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.declarative import DeclarativeMeta
+
+    BaseClass = DeclarativeMeta
+else:
+    BaseClass = object
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 class EpubHighlight(Base):
     """EPUBハイライトモデル"""
+
     __tablename__ = "epub_highlights"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     book_title = Column(String(500), nullable=False, index=True)
     chapter_title = Column(String(500), nullable=False)
@@ -31,7 +41,7 @@ engine = create_engine("sqlite:///cache/epub_highlights.db", echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db():
+def get_db() -> Generator[Session, None, None]:
     """データベースセッションを取得"""
     db = SessionLocal()
     try:
@@ -40,8 +50,9 @@ def get_db():
         db.close()
 
 
-def init_db():
+def init_db() -> None:
     """データベースを初期化"""
     import os
+
     os.makedirs("cache", exist_ok=True)
     Base.metadata.create_all(bind=engine)

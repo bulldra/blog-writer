@@ -1,20 +1,21 @@
 import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.routers import ai, drafts, auth
+from app.routers import ai, auth, drafts
 from app.routers import article_templates as article_templates_router
 from app.routers import epub as epub_router
 from app.routers import generation_history as generation_history_router
 from app.routers import images as images_router
 from app.routers import migrations as migrations_router
+from app.routers import notion as notion_router
 from app.routers import obsidian as obsidian_router
 from app.routers import templates as templates_router
-from app.routers import notion as notion_router
 from app.routers import writing_styles as writing_styles_router
 from app.storage import init_storage
 
@@ -115,7 +116,7 @@ def create_app() -> FastAPI:
     )
 
     @app.get("/api/health")
-    def health():
+    def health() -> Dict[str, str]:
         return {"status": "ok"}
 
     ai_paths = [

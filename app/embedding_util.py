@@ -2,11 +2,11 @@
 
 import pickle
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from sklearn.neighbors import NearestNeighbors
 
 
 class EmbeddingManager:
@@ -20,7 +20,8 @@ class EmbeddingManager:
         """
         self.model_name = model_name
         self.model: Optional[SentenceTransformer] = None
-        self.index: Optional[faiss.IndexFlatIP] = None
+        self.index: Optional[NearestNeighbors] = None
+        self.embeddings: Optional[np.ndarray] = None
         self.texts: List[str] = []
         self.metadata: List[Dict[str, str]] = []
 
@@ -29,8 +30,9 @@ class EmbeddingManager:
         if self.model is None:
             self.model = SentenceTransformer(self.model_name)
 
-    def encode_texts(self, texts: List[str]) -> np.ndarray:
-        """テキストを埋め込みベクトルに変換
+    def encode_texts(self, texts: List[str]) -> Any:
+        """
+        テキストを埋め込みベクトルに変換
 
         Args:
             texts: 埋め込み対象のテキストリスト
@@ -43,17 +45,20 @@ class EmbeddingManager:
             raise RuntimeError("埋め込みモデルの読み込みに失敗しました")
 
         # バッチ処理で効率化
-        embeddings = self.model.encode(texts, batch_size=32, show_progress_bar=True)
+        local_embeddings = self.model.encode(
+            texts, batch_size=32, show_progress_bar=True
+        )
 
         # 正規化（コサイン類似度用）
-        embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
-
-        return embeddings
+        local_embeddings = local_embeddings / np.linalg.norm(
+            local_embeddings, axis=1, keepdims=True
+        )
+        return local_embeddings.astype(np.ndarray)
 
     def build_index(
         self, texts: List[str], metadata: Optional[List[Dict[str, str]]] = None
     ) -> None:
-        """FAISSインデックスを構築
+        """scikit-learnベースのインデックスを構築
 
         Args:
             texts: インデックス対象のテキストリスト
@@ -66,14 +71,17 @@ class EmbeddingManager:
         self.metadata = metadata or [{"text": text} for text in texts]
 
         # 埋め込みベクトルを生成
-        embeddings = self.encode_texts(texts)
+        self.embeddings = self.encode_texts(texts)
 
-        # FAISSインデックスを作成（内積用）
-        dimension = embeddings.shape[1]
-        self.index = faiss.IndexFlatIP(dimension)
+        # scikit-learnのNearestNeighborsを使用（コサイン距離）
+        self.index = NearestNeighbors(
+            n_neighbors=min(50, len(texts)),  # 最大50件
+            metric="cosine",
+            algorithm="brute",  # 小規模データセットには最適
+        )
 
-        # ベクトルを追加
-        self.index.add(embeddings.astype(np.float32))
+        # インデックスを構築
+        self.index.fit(self.embeddings)
 
     def search(
         self, query: str, top_k: int = 5, min_score: float = 0.1
@@ -83,26 +91,27 @@ class EmbeddingManager:
         Args:
             query: 検索クエリ
             top_k: 返す結果数
-            min_score: 最小類似度スコア
+            min_score: 最小類似度スコア（コサイン類似度: 1.0 - コサイン距離）
 
         Returns:
             (テキスト, メタデータ, スコア)のタプルのリスト
         """
-        if not self.index or not self.texts:
+        if not self.index or not self.texts or self.embeddings is None:
             return []
 
         # クエリの埋め込みベクトルを生成
         query_embedding = self.encode_texts([query])
 
-        # 検索実行
-        scores, indices = self.index.search(
-            query_embedding.astype(np.float32), min(top_k, len(self.texts))
-        )
+        # 検索実行（k近傍）
+        k = min(top_k, len(self.texts))
+        distances, indices = self.index.kneighbors(query_embedding, n_neighbors=k)
 
         results = []
-        for score, idx in zip(scores[0], indices[0]):
-            if idx != -1 and score >= min_score:
-                results.append((self.texts[idx], self.metadata[idx], float(score)))
+        for distance, idx in zip(distances[0], indices[0]):
+            # コサイン距離からコサイン類似度に変換
+            similarity = 1.0 - distance
+            if similarity >= min_score:
+                results.append((self.texts[idx], self.metadata[idx], float(similarity)))
 
         return results
 
@@ -112,25 +121,22 @@ class EmbeddingManager:
         Args:
             filepath: 保存先ファイルパス
         """
-        if not self.index:
+        if not self.index or self.embeddings is None:
             raise ValueError("保存するインデックスがありません")
 
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        # FAISSインデックスを保存
-        faiss.write_index(self.index, str(filepath.with_suffix(".faiss")))
+        # すべてのデータをPickleで保存
+        data = {
+            "texts": self.texts,
+            "metadata": self.metadata,
+            "model_name": self.model_name,
+            "embeddings": self.embeddings,
+            "index": self.index,
+        }
 
-        # メタデータを保存
-        metadata_file = filepath.with_suffix(".pkl")
-        with open(metadata_file, "wb") as f:
-            pickle.dump(
-                {
-                    "texts": self.texts,
-                    "metadata": self.metadata,
-                    "model_name": self.model_name,
-                },
-                f,
-            )
+        with open(filepath.with_suffix(".pkl"), "wb") as f:
+            pickle.dump(data, f)
 
     def load_index(self, filepath: Path) -> bool:
         """ファイルからインデックスを読み込み
@@ -142,21 +148,20 @@ class EmbeddingManager:
             読み込み成功の可否
         """
         try:
-            faiss_file = filepath.with_suffix(".faiss")
-            metadata_file = filepath.with_suffix(".pkl")
+            data_file = filepath.with_suffix(".pkl")
 
-            if not faiss_file.exists() or not metadata_file.exists():
+            if not data_file.exists():
                 return False
 
-            # FAISSインデックスを読み込み
-            self.index = faiss.read_index(str(faiss_file))
-
-            # メタデータを読み込み
-            with open(metadata_file, "rb") as f:
+            # データを読み込み
+            with open(data_file, "rb") as f:
                 data = pickle.load(f)
-                self.texts = data["texts"]
-                self.metadata = data["metadata"]
-                self.model_name = data.get("model_name", self.model_name)
+
+            self.texts = data["texts"]
+            self.metadata = data["metadata"]
+            self.model_name = data.get("model_name", self.model_name)
+            self.embeddings = data.get("embeddings")
+            self.index = data.get("index")
 
             return True
 
@@ -175,7 +180,7 @@ class EmbeddingManager:
         if not new_texts:
             return
 
-        if not self.index:
+        if not self.index or self.embeddings is None:
             # インデックスが存在しない場合は新規作成
             self.build_index(new_texts, new_metadata)
             return
@@ -183,15 +188,21 @@ class EmbeddingManager:
         # 新しいテキストの埋め込みを生成
         new_embeddings = self.encode_texts(new_texts)
 
-        # インデックスに追加
-        self.index.add(new_embeddings.astype(np.float32))
+        # 既存の埋め込みと結合
+        self.embeddings = np.vstack([self.embeddings, new_embeddings])
 
-        # メタデータを追加
+        # テキストとメタデータを追加
         self.texts.extend(new_texts)
         if new_metadata:
             self.metadata.extend(new_metadata)
         else:
             self.metadata.extend([{"text": text} for text in new_texts])
+
+        # インデックスを再構築
+        self.index = NearestNeighbors(
+            n_neighbors=min(50, len(self.texts)), metric="cosine", algorithm="brute"
+        )
+        self.index.fit(self.embeddings)
 
     def get_stats(self) -> Dict[str, int]:
         """インデックスの統計情報を取得
@@ -201,6 +212,6 @@ class EmbeddingManager:
         """
         return {
             "total_texts": len(self.texts),
-            "index_size": self.index.ntotal if self.index else 0,
-            "dimension": self.index.d if self.index else 0,
+            "index_size": len(self.texts) if self.index else 0,
+            "dimension": self.embeddings.shape[1] if self.embeddings is not None else 0,
         }

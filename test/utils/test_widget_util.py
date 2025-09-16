@@ -1,6 +1,5 @@
 """Tests for widget utility functions."""
 
-import pytest
 from app.widget_util import (
     get_widget_default_config,
     validate_widget_config,
@@ -11,11 +10,11 @@ from app.widget_util import (
 def test_get_widget_default_config():
     """Test getting default configuration for widgets."""
     notion_config = get_widget_default_config("notion")
-    
+
     assert notion_config["page_ids"] == []
     assert notion_config["search_query"] == ""
     assert notion_config["max_pages"] == 5
-    
+
     # Test unknown widget type
     unknown_config = get_widget_default_config("unknown_widget")
     assert unknown_config == {}
@@ -27,56 +26,36 @@ def test_validate_widget_config_notion():
     valid_config1 = {
         "page_ids": ["page_id_1", "page_id_2"],
         "search_query": "",
-        "max_pages": 5
+        "max_pages": 5,
     }
     assert validate_widget_config("notion", valid_config1) is True
-    
+
     # Valid config with search query
-    valid_config2 = {
-        "page_ids": [],
-        "search_query": "test query",
-        "max_pages": 3
-    }
+    valid_config2 = {"page_ids": [], "search_query": "test query", "max_pages": 3}
     assert validate_widget_config("notion", valid_config2) is True
-    
+
     # Valid config with both
     valid_config3 = {
         "page_ids": ["page_id_1"],
         "search_query": "test query",
-        "max_pages": 1
+        "max_pages": 1,
     }
     assert validate_widget_config("notion", valid_config3) is True
-    
+
     # Invalid: no page IDs and no search query
-    invalid_config1 = {
-        "page_ids": [],
-        "search_query": "",
-        "max_pages": 5
-    }
+    invalid_config1 = {"page_ids": [], "search_query": "", "max_pages": 5}
     assert validate_widget_config("notion", invalid_config1) is False
-    
+
     # Invalid: page_ids is not a list
-    invalid_config2 = {
-        "page_ids": "not_a_list",
-        "search_query": "",
-        "max_pages": 5
-    }
+    invalid_config2 = {"page_ids": "not_a_list", "search_query": "", "max_pages": 5}
     assert validate_widget_config("notion", invalid_config2) is False
-    
+
     # Invalid: empty page ID in list
-    invalid_config3 = {
-        "page_ids": ["valid_id", ""],
-        "search_query": "",
-        "max_pages": 5
-    }
+    invalid_config3 = {"page_ids": ["valid_id", ""], "search_query": "", "max_pages": 5}
     assert validate_widget_config("notion", invalid_config3) is False
-    
+
     # Invalid: search_query is not a string
-    invalid_config4 = {
-        "page_ids": [],
-        "search_query": 123,
-        "max_pages": 5
-    }
+    invalid_config4 = {"page_ids": [], "search_query": 123, "max_pages": 5}
     assert validate_widget_config("notion", invalid_config4) is False
 
 
@@ -90,12 +69,8 @@ def test_validate_widget_config_unknown():
 def test_process_widget_sync_notion_disabled():
     """Test processing Notion widget when disabled."""
     # This test verifies that the function handles disabled Notion gracefully
-    widget_data = {
-        "page_ids": ["test_page_id"],
-        "search_query": "",
-        "max_pages": 1
-    }
-    
+    widget_data = {"page_ids": ["test_page_id"], "search_query": "", "max_pages": 1}
+
     # Should return None when Notion is disabled or not configured
     result = process_widget_sync("notion", widget_data)
     # We expect None since Notion is not configured in test environment
@@ -120,8 +95,8 @@ def test_process_widget_sync_invalid_data():
     invalid_data = {
         "page_ids": [],
         "search_query": "",  # Both empty, should fail validation
-        "max_pages": 5
+        "max_pages": 5,
     }
-    
+
     result = process_widget_sync("notion", invalid_data)
     assert result is None

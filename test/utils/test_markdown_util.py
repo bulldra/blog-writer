@@ -1,5 +1,9 @@
 """Markdownユーティリティのテスト"""
-from app.markdown_util import generate_writing_style_markdown, generate_style_comparison_markdown
+
+from app.markdown_util import (
+    generate_writing_style_markdown,
+    generate_style_comparison_markdown,
+)
 
 
 def test_generate_writing_style_markdown_basic():
@@ -15,9 +19,9 @@ def test_generate_writing_style_markdown_basic():
         "created_at": "2023-01-01T00:00:00Z",
         "updated_at": "2023-01-02T00:00:00Z",
     }
-    
+
     result = generate_writing_style_markdown(style_data)
-    
+
     assert "# テスト文体" in result
     assert "## 説明" in result
     assert "テスト用の文体です" in result
@@ -36,9 +40,9 @@ def test_generate_writing_style_markdown_minimal():
         "source_text": "",
         "properties": {},
     }
-    
+
     result = generate_writing_style_markdown(style_data)
-    
+
     assert "# 最小文体" in result
     assert "## 使用方法" in result
     # 空のセクションは含まれない
@@ -50,7 +54,7 @@ def test_generate_writing_style_markdown_minimal():
 def test_generate_style_comparison_markdown_empty():
     """空のリストでの比較表生成のテスト"""
     result = generate_style_comparison_markdown([])
-    
+
     assert "# 文体テンプレート比較" in result
     assert "文体テンプレートがありません" in result
 
@@ -78,9 +82,9 @@ def test_generate_style_comparison_markdown_multiple():
             "source_text": "拝啓、時下ますます...",
         },
     ]
-    
+
     result = generate_style_comparison_markdown(styles)
-    
+
     assert "# 文体テンプレート比較" in result
     assert "| 文体名 | 説明 |" in result
     assert "カジュアル文体" in result
@@ -97,14 +101,15 @@ def test_generate_style_comparison_markdown_long_text():
             "name": "長い説明の文体",
             "description": "これはとても長い説明文です。" * 10,  # 長い説明
             "properties": {
-                "very_long_property_name": "とても長いプロパティ値です" * 5,  # 長いプロパティ
+                "very_long_property_name": "とても長いプロパティ値です"
+                * 5,  # 長いプロパティ
             },
             "source_text": "長いソーステキストです。" * 50,  # 長いソーステキスト
         },
     ]
-    
+
     result = generate_style_comparison_markdown(styles)
-    
+
     # 長いテキストが省略されていることを確認
     assert "..." in result
     # テーブル形式が保たれていることを確認

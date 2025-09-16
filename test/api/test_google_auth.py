@@ -10,26 +10,6 @@ from app.main import create_app
 from app.routers.auth import create_jwt_token, verify_jwt_token
 
 
-@pytest.fixture
-def client():
-    app = create_app()
-    return TestClient(app)
-
-
-@pytest.fixture
-def mock_env():
-    """環境変数のモック"""
-    with patch.dict(
-        os.environ,
-        {
-            "GOOGLE_OAUTH_CLIENT_ID": "test_client_id",
-            "GOOGLE_OAUTH_CLIENT_SECRET": "test_client_secret",
-            "SECRET_KEY": "test_secret_key",
-        },
-    ):
-        yield
-
-
 def test_jwt_token_creation_and_verification(mock_env):
     """JWTトークンの作成と検証をテスト"""
     user_data = {

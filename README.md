@@ -6,7 +6,7 @@
 -   辞書: 用語の簡易定義（スタブ）
 -   いい回し登録: よく使う表現の保存/参照
 -   下書き保存: 生成結果を保存・一覧・編集・削除（JSON ファイルに永続化）
--   Notion MCP: Notion連携による情報取得と記事記録
+-   Notion MCP: Notion 連携による情報取得と記事記録
 
 構成
 
@@ -50,42 +50,52 @@ API エンドポイント（抜粋）
 ## Notion MCP 連携
 
 ### 概要
-Model Context Protocol (MCP) を通じてNotionとの連携を提供します。
+
+Model Context Protocol (MCP) を通じて Notion との連携を提供します。
+Python クライアントは fast-mcp を使用します（フォールバックなし）。
 
 ### 機能
-- Notionページの情報取得
-- ページ検索
-- 記事作成時のNotionページコンテキスト利用
-- 生成した記事のNotionへの投稿
+
+-   Notion ページの情報取得
+-   ページ検索
+-   記事作成時の Notion ページコンテキスト利用
+-   生成した記事の Notion への投稿
 
 ### 設定方法
+
 1. Notion API キーの取得
-   - [Notion Developers](https://developers.notion.com/) で API キーを作成
-   - 必要な権限（読み取り・書き込み）を設定
+
+    - [Notion Developers](https://developers.notion.com/) で API キーを作成
+    - 必要な権限（読み取り・書き込み）を設定
 
 2. MCP サーバーの設定
-   - NPM で Notion MCP サーバーをインストール：
-     ```bash
-     npm install -g @modelcontextprotocol/server-notion
-     ```
 
-3. API経由で設定を保存
-   ```json
-   {
-     "command": "npx",
-     "args": ["@modelcontextprotocol/server-notion"],
-     "env": {
-       "NOTION_API_KEY": "your_notion_api_key"
-     },
-     "enabled": true,
-     "default_parent_id": "optional_default_parent_page_id"
-   }
-   ```
+    - NPM で Notion MCP サーバーをインストール：
+        ```bash
+        npm install -g @modelcontextprotocol/server-notion
+        ```
+
+    Python クライアント側（本リポジトリ）では fast-mcp を利用します（依存定義済）。
+
+3. API 経由で設定を保存
+    ```json
+    {
+    	"command": "npx",
+    	"args": ["@modelcontextprotocol/server-notion"],
+    	"env": {
+    		"NOTION_API_KEY": "your_notion_api_key"
+    	},
+    	"enabled": true,
+    	"default_parent_id": "optional_default_parent_page_id"
+    }
+    ```
 
 ### ウィジェット利用
-記事生成時に Notion ウィジェットを使用して、Notionページの情報をコンテキストとして活用できます。
 
-### API使用例
+記事生成時に Notion ウィジェットを使用して、Notion ページの情報をコンテキストとして活用できます。
+
+### API 使用例
+
 ```bash
 # 接続テスト
 curl -X POST http://localhost:8000/api/notion/test-connection

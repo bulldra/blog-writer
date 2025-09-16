@@ -153,6 +153,27 @@ def inject_rag_context(prompt: str, rag_context: str) -> str:
     return rag_section + prompt
 
 
+async def call_ai(
+    prompt: str,
+) -> str:  # pragma: no cover - tests patch this  # type: ignore[no-any-return]
+    """AI呼び出しの軽量スタブ。テストではこの関数をパッチする。
+
+    Args:
+        prompt: 生成に用いるプロンプト
+
+    Returns:
+        AI応答のテキスト
+    """
+    try:
+        from app.routers.ai import GenerateRequest, generate
+
+        req = GenerateRequest(prompt=prompt)
+        resp = await generate(req)
+        return str(resp.get("text", ""))
+    except Exception:
+        return ""
+
+
 async def analyze_writing_style(text: str) -> Optional[dict]:
     """
     文章を分析して文体の特徴を抽出する
@@ -191,24 +212,31 @@ async def analyze_writing_style(text: str) -> Optional[dict]:
 """
 
     try:
-        # ai.pyのgenerate関数を使用するためのリクエストを作成
-        from app.routers.ai import GenerateRequest, generate
-
-        request = GenerateRequest(prompt=prompt)
-        response = await generate(request)
-
-        result_text = response.get("text", "")
+        result_text = await call_ai(prompt)
         if not result_text or "[stub" in result_text:
             return None
 
         # JSON部分を抽出
         result_text = result_text.strip()
-        if result_text.startswith("```json"):
+        if result_text.startswith("{") and result_text.endswith("}"):
+            pass
+        elif result_text.startswith("```json"):
             result_text = result_text.replace("```json", "").replace("```", "").strip()
         elif result_text.startswith("```"):
             result_text = result_text.replace("```", "").strip()
 
-        return json.loads(result_text)
+        try:
+            return json.loads(result_text)  # type: ignore[no-any-return]
+        except Exception:
+            import ast
+
+            try:
+                obj = ast.literal_eval(result_text)
+                if isinstance(obj, dict):
+                    return obj  # best-effort for dict-like strings  # type: ignore[no-any-return]
+            except Exception:
+                pass
+            return None
 
     except Exception:
         return None

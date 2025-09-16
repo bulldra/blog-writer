@@ -1,13 +1,17 @@
 """EPUB処理機能のテスト"""
 
-import pytest
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
+
 from app.epub_util import (
-    extract_text_from_epub,
     chunk_text,
-    get_epub_files,
     extract_metadata,
+    extract_text_from_epub,
+    get_epub_files,
+    sanitize_filename,
 )
 
 
@@ -18,6 +22,66 @@ def test_chunk_text():
 
     assert len(chunks) > 1
     assert all(len(chunk) <= 120 for chunk in chunks)  # オーバーラップ考慮
+
+
+def test_chunk_text_empty():
+    """空テキストのチャンク化テスト"""
+    chunks = chunk_text("", chunk_size=100, overlap=10)
+    assert chunks == []
+
+
+def test_chunk_text_short():
+    """短いテキストのチャンク化テスト"""
+    text = "短いテキスト"
+    chunks = chunk_text(text, chunk_size=100, overlap=10)
+    assert len(chunks) == 1
+    assert chunks[0] == text
+
+
+def test_sanitize_filename_basic():
+    """ファイル名サニタイズの基本テスト"""
+    filename = "テスト:ファイル?名*.txt"
+    result = sanitize_filename(filename)
+
+    assert ":" not in result
+    assert "?" not in result
+    assert "*" not in result
+    assert result.endswith(".txt")
+
+
+def test_sanitize_filename_path_separators():
+    """パス区切り文字のサニタイズテスト"""
+    filename = "folder/subfolder\\file.txt"
+    result = sanitize_filename(filename)
+
+    assert "/" not in result
+    assert "\\" not in result
+
+
+def test_get_epub_files_empty_dir():
+    """空ディレクトリでのEPUBファイル検索テスト"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        epub_dir = Path(tmpdir)
+        files = get_epub_files(epub_dir)
+        assert files == []
+
+
+def test_get_epub_files_with_files():
+    """EPUBファイルありのディレクトリ検索テスト"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        epub_dir = Path(tmpdir)
+
+        # テストファイル作成
+        (epub_dir / "test1.epub").touch()
+        (epub_dir / "test2.txt").touch()  # 非EPUB
+        (epub_dir / "test3.EPUB").touch()  # 大文字拡張子
+
+        files = get_epub_files(epub_dir)
+
+        epub_files = [f.name for f in files]
+        assert "test1.epub" in epub_files
+        assert "test3.EPUB" in epub_files
+        assert "test2.txt" not in epub_files
 
 
 def test_chunk_text_short():

@@ -11,13 +11,16 @@ dependencies = [
 	"google-genai>=0.3.0",
 	"cryptography>=43.0.1",
 	"pytest>=8.3.0",
+	"pytest-asyncio>=0.25.0",
 	"python-jose[cryptography]>=3.3.0",
 	"authlib>=1.2.0",
 	"itsdangerous>=2.1.0",
 	"ebooklib>=0.19",
-	"faiss-cpu>=1.12.0",
+	"scikit-learn>=1.5.0",
 	"sentence-transformers>=5.1.0",
 	"beautifulsoup4>=4.12.0",
+	"fastmcp>=2.12.3",
+    "SQLAlchemy>=2.0.0",
 ]
 
 [tool.uv]
@@ -28,12 +31,16 @@ dependencies = [
 python_version = "3.12"
 warn_unused_configs = true
 disallow_untyped_defs = false
-check_untyped_defs = false
+check_untyped_defs = true
 no_implicit_optional = true
 strict_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_return_any = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -44,6 +51,13 @@ module = [
 	"authlib",
 	"authlib.integrations.starlette_client",
 	"jose",
+	"fastmcp",
+	"ebooklib",
+	"sentence_transformers",
+	"sklearn",
+	"sklearn.neighbors",
+	"sqlalchemy",
+	"sqlalchemy.ext.declarative",
 ]
 ignore_missing_imports = true
 

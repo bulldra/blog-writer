@@ -52,7 +52,7 @@ class GenerateRequest(BaseModel):
 
 
 @router.get("/settings")
-def get_settings():
+def get_settings() -> Dict[str, Any]:
     row = get_ai_settings()
     provider = str(row.get("provider", "gemini"))
     default_model = (
@@ -336,33 +336,35 @@ def _sanitize_bullets_request(req: BulletsRequest) -> BulletsRequest:
 
 def _process_widgets(req: BulletsRequest) -> Optional[str]:
     """Process widgets and return combined context.
-    
+
     Args:
         req: Request containing widget configurations
-        
+
     Returns:
         Combined context from all widgets or None if no widgets
     """
     if not req.widgets:
         return None
-    
+
     context_parts = []
-    
+
     for widget in req.widgets:
         widget_type = widget.get("type", "")
         widget_data = widget.get("data", {})
-        
+
         try:
             context = process_widget_sync(widget_type, widget_data)
             if context:
-                context_parts.append(f"## {widget_type.title()} Widget Context\n{context}")
+                context_parts.append(
+                    f"## {widget_type.title()} Widget Context\n{context}"
+                )
         except Exception as e:
             _logger.error(f"Error processing {widget_type} widget: {e}")
             continue
-    
+
     if context_parts:
         return "\n\n---\n\n".join(context_parts)
-    
+
     return None
 
 
@@ -375,7 +377,7 @@ async def from_bullets(req: BulletsRequest):
     max_len = int(row.get("max_prompt_len", 32768))
 
     req2 = _sanitize_bullets_request(req)
-    
+
     # Process widgets first to get additional context
     widget_context = _process_widgets(req2)
     if widget_context and not req2.notion_context:
@@ -383,7 +385,7 @@ async def from_bullets(req: BulletsRequest):
     elif widget_context and req2.notion_context:
         combined_context = f"{req2.notion_context}\n\n---\n\n{widget_context}"
         req2 = req2.model_copy(update={"notion_context": combined_context})
-    
+
     bullets = [b.strip() for b in (req2.bullets or []) if b and b.strip()]
     prompt = _build_bullets_prompt(req2, bullets)
 
@@ -512,7 +514,7 @@ async def from_bullets_stream(req: BulletsRequest):
     max_len = int(row.get("max_prompt_len", 32768))
 
     req2 = _sanitize_bullets_request(req)
-    
+
     # Process widgets first to get additional context
     widget_context = _process_widgets(req2)
     if widget_context and not req2.notion_context:
@@ -520,7 +522,7 @@ async def from_bullets_stream(req: BulletsRequest):
     elif widget_context and req2.notion_context:
         combined_context = f"{req2.notion_context}\n\n---\n\n{widget_context}"
         req2 = req2.model_copy(update={"notion_context": combined_context})
-    
+
     bullets = [b.strip() for b in (req2.bullets or []) if b and b.strip()]
     prompt = _build_bullets_prompt(req2, bullets)
 
@@ -713,7 +715,7 @@ async def from_bullets_stream(req: BulletsRequest):
 async def from_bullets_prompt(req: BulletsRequest):
     """最終的に使用するプロンプトを返す。モデル呼び出しは行わない。"""
     req2 = _sanitize_bullets_request(req)
-    
+
     # Process widgets first to get additional context
     widget_context = _process_widgets(req2)
     if widget_context and not req2.notion_context:
@@ -721,7 +723,7 @@ async def from_bullets_prompt(req: BulletsRequest):
     elif widget_context and req2.notion_context:
         combined_context = f"{req2.notion_context}\n\n---\n\n{widget_context}"
         req2 = req2.model_copy(update={"notion_context": combined_context})
-    
+
     bullets = [b.strip() for b in (req2.bullets or []) if b and b.strip()]
     prompt = _build_bullets_prompt(req2, bullets)
     if req2.url_context:

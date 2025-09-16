@@ -6,7 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, cast
 
 logger = logging.getLogger("obsidian")
 
@@ -54,13 +54,13 @@ def _settings_path() -> Path:
     return Path("./data").absolute() / "settings.json"
 
 
-def _load_settings() -> Dict[str, object]:
+def _load_settings() -> Dict[str, Any]:
     path = _settings_path()
     try:
         if path.exists():
             raw = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(raw, dict):
-                return cast(Dict[str, object], raw)
+                return cast(Dict[str, Any], raw)
             logger.warning(
                 "obsidian.settings_invalid_type path=%s type=%s",
                 path,
@@ -122,8 +122,6 @@ def set_configured_obsidian_config(
 ) -> Optional[ObsidianConfig]:
     """新しい設定構造でObsidian設定を保存"""
     cfg = _load_settings()
-    if not isinstance(cfg, dict):
-        cfg = {}
 
     if root_dir and root_dir.strip():
         root_path = Path(root_dir).expanduser()

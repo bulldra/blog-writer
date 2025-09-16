@@ -1,17 +1,9 @@
-from app.main import create_app
-
-
-def _client():
-    # FastAPI 公式のシンプルクライアント（標準ライブラリ http.client ベース）
-    # fastapi[standard] で利用可能
-    from fastapi.testclient import TestClient
-
-    app = create_app()
-    return TestClient(app)
+from test.helpers.api import validate_template_response
+from test.helpers.common import create_test_client
 
 
 def test_api_save_article_template_duplicate_key_returns_400():
-    c = _client()
+    c = create_test_client()
     payload = {
         "name": "dup",
         "fields": [
@@ -26,7 +18,7 @@ def test_api_save_article_template_duplicate_key_returns_400():
 
 
 def test_api_save_article_template_too_many_fields_returns_400():
-    c = _client()
+    c = create_test_client()
     fields = [
         {"key": f"k{i}", "label": f"L{i}", "input_type": "text"} for i in range(31)
     ]

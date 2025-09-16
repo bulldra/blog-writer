@@ -1,13 +1,15 @@
-"""Notion MCP client utilities for blog writer."""
+"""Notion MCP client utilities for blog writer (fastmcp 版)。"""
 
 import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from mcp import ClientSession
-from mcp.client.stdio import StdioServerParameters, stdio_client
+from fastmcp.client.client import Client, StdioTransport
 
 logger = logging.getLogger(__name__)
+
+
+# fastmcp を前提として直接利用
 
 
 class NotionMCPClient:
@@ -19,8 +21,8 @@ class NotionMCPClient:
         Args:
             config: Dictionary containing MCP server configuration
         """
-        self.config = config
-        self._session: Optional[ClientSession] = None
+        self.config: Dict[str, Any] = config
+        self._session: Optional[Any] = None
 
     async def __aenter__(self):
         """Async context manager entry."""
@@ -34,15 +36,15 @@ class NotionMCPClient:
     async def connect(self) -> None:
         """Connect to the Notion MCP server."""
         try:
-            # MCPサーバーのパラメータを設定
-            server_params = StdioServerParameters(
+            transport = StdioTransport(
                 command=self.config.get("command", "npx"),
                 args=self.config.get("args", ["@modelcontextprotocol/server-notion"]),
                 env=self.config.get("env", {}),
             )
 
-            # MCP セッションを開始
-            self._session = await stdio_client(server_params).__aenter__()
+            # クライアント開始（async context manager を open）
+            client = Client(transport=transport, name="notion-mcp")
+            self._session = await client.__aenter__()
             logger.info("Connected to Notion MCP server")
 
         except Exception as e:
@@ -78,8 +80,21 @@ class NotionMCPClient:
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
                 if hasattr(content_item, "text"):
-                    pages_data = json.loads(content_item.text)
-                    return pages_data.get("results", [])
+                    try:
+                        pages_data = json.loads(getattr(content_item, "text", ""))
+                    except Exception:
+                        return []
+                    results = (
+                        pages_data.get("results", [])
+                        if isinstance(pages_data, dict)
+                        else []
+                    )
+                    if isinstance(results, list):
+                        rows: List[Dict[str, Any]] = []
+                        for it in results:
+                            if isinstance(it, dict):
+                                rows.append(it)
+                        return rows
 
             return []
 
@@ -106,7 +121,12 @@ class NotionMCPClient:
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
                 if hasattr(content_item, "text"):
-                    return json.loads(content_item.text)
+                    try:
+                        data = json.loads(getattr(content_item, "text", ""))
+                    except Exception:
+                        return None
+                    if isinstance(data, dict):
+                        return data
 
             return None
 
@@ -136,8 +156,21 @@ class NotionMCPClient:
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
                 if hasattr(content_item, "text"):
-                    search_data = json.loads(content_item.text)
-                    return search_data.get("results", [])
+                    try:
+                        search_data = json.loads(getattr(content_item, "text", ""))
+                    except Exception:
+                        return []
+                    results = (
+                        search_data.get("results", [])
+                        if isinstance(search_data, dict)
+                        else []
+                    )
+                    if isinstance(results, list):
+                        rows: List[Dict[str, Any]] = []
+                        for it in results:
+                            if isinstance(it, dict):
+                                rows.append(it)
+                        return rows
 
             return []
 
@@ -176,7 +209,12 @@ class NotionMCPClient:
             if isinstance(result.content, list) and result.content:
                 content_item = result.content[0]
                 if hasattr(content_item, "text"):
-                    return json.loads(content_item.text)
+                    try:
+                        data = json.loads(getattr(content_item, "text", ""))
+                    except Exception:
+                        return None
+                    if isinstance(data, dict):
+                        return data
 
             return None
 

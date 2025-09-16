@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import ebooklib
-from ebooklib import epub
 from bs4 import BeautifulSoup
+from ebooklib import epub
 
 
 def extract_text_from_epub(epub_path: Path) -> Tuple[str, Dict[str, str]]:
@@ -112,7 +112,7 @@ def get_epub_files(directory: Path) -> List[Path]:
     if not directory.exists():
         return []
 
-    epub_files = []
+    epub_files: list[Path] = []
     for pattern in ["*.epub", "*.EPUB"]:
         epub_files.extend(directory.glob(pattern))
         # サブディレクトリも検索

@@ -1,27 +1,17 @@
 """文体テンプレートストレージのテスト"""
-import json
+
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
 
 import pytest
 
 from app.storage import (
-    init_storage,
-    save_writing_style,
-    get_writing_style,
-    list_writing_styles,
     delete_writing_style,
+    get_writing_style,
+    init_storage,
+    list_writing_styles,
+    save_writing_style,
 )
-
-
-@pytest.fixture
-def temp_data_dir(monkeypatch):
-    """一時的なデータディレクトリを作成"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setenv("BLOGWRITER_DATA_DIR", tmpdir)
-        init_storage()
-        yield Path(tmpdir)
 
 
 def test_writing_style_defaults_present(temp_data_dir):
@@ -43,13 +33,13 @@ def test_writing_style_save_and_retrieve(temp_data_dir):
         "source_text": "元となる文章のサンプルです。",
         "description": "テスト用の文体テンプレートです。",
     }
-    
+
     # 保存
     saved_style = save_writing_style("test_style", style_data)
     assert saved_style is not None
     assert saved_style["id"] == "test_style"
     assert saved_style["name"] == "テスト文体"
-    
+
     # 取得
     retrieved_style = get_writing_style("test_style")
     assert retrieved_style is not None
@@ -66,10 +56,10 @@ def test_writing_style_list_includes_saved(temp_data_dir):
         "source_text": "サンプルテキスト",
         "description": "リスト確認用",
     }
-    
+
     save_writing_style("list_test", style_data)
     styles = list_writing_styles()
-    
+
     test_style = next((s for s in styles if s["id"] == "list_test"), None)
     assert test_style is not None
     assert test_style["name"] == "リスト確認用文体"
@@ -83,24 +73,26 @@ def test_writing_style_update_existing(temp_data_dir):
         "source_text": "元のテキスト",
         "description": "更新前",
     }
-    
+
     updated_data = {
         "name": "更新後文体",
         "properties": {"tone": "カジュアル"},
         "source_text": "更新されたテキスト",
         "description": "更新後",
     }
-    
+
     # 初期保存
     save_writing_style("update_test", original_data)
-    
+
     # 更新
     updated_style = save_writing_style("update_test", updated_data)
+    assert updated_style is not None
     assert updated_style["name"] == "更新後文体"
     assert updated_style["properties"]["tone"] == "カジュアル"
-    
+
     # 取得して確認
     retrieved = get_writing_style("update_test")
+    assert retrieved is not None
     assert retrieved["name"] == "更新後文体"
 
 
@@ -112,15 +104,15 @@ def test_writing_style_delete(temp_data_dir):
         "source_text": "削除されるテキスト",
         "description": "削除テスト用",
     }
-    
+
     # 保存
     save_writing_style("delete_test", style_data)
     assert get_writing_style("delete_test") is not None
-    
+
     # 削除
     result = delete_writing_style("delete_test")
     assert result is True
-    
+
     # 削除確認
     assert get_writing_style("delete_test") is None
 
@@ -146,17 +138,17 @@ def test_writing_style_properties_validation(temp_data_dir):
         "source_text": "",
         "description": "",
     }
-    
+
     style = save_writing_style("minimal", minimal_data)
     assert style is not None
     assert style["properties"] == {}
-    
+
     # 完全なデータ
     complete_data = {
         "name": "完全文体",
         "properties": {
             "tone": "プロフェッショナル",
-            "formality": "フォーマル", 
+            "formality": "フォーマル",
             "length_preference": "詳細",
             "target_audience": "専門家",
             "writing_style": "解説的",
@@ -164,7 +156,7 @@ def test_writing_style_properties_validation(temp_data_dir):
         "source_text": "詳細な説明を含む文章のサンプルです。",
         "description": "プロフェッショナル向けの詳細な文体テンプレート",
     }
-    
+
     style = save_writing_style("complete", complete_data)
     assert style is not None
     assert len(style["properties"]) == 5

@@ -124,7 +124,7 @@ async def list_pages(limit: int = 10) -> List[Dict[str, Any]]:
 
         async with NotionMCPClient(settings) as client:
             pages = await client.list_pages(limit=min(limit, 50))
-            return pages
+            return pages  # type: ignore[no-any-return]
 
     except HTTPException:
         raise
@@ -155,7 +155,7 @@ async def get_page(page_id: str) -> Dict[str, Any]:
             if page is None:
                 raise HTTPException(status_code=404, detail="Page not found")
 
-            return page
+            return page  # type: ignore[no-any-return]
 
     except HTTPException:
         raise
@@ -182,7 +182,7 @@ async def search_pages(request: NotionSearchRequest) -> List[Dict[str, Any]]:
 
         async with NotionMCPClient(settings) as client:
             pages = await client.search_pages(request.query, request.limit)
-            return pages
+            return pages  # type: ignore[no-any-return]
 
     except HTTPException:
         raise
@@ -216,7 +216,7 @@ async def create_page(request: NotionPageRequest) -> Dict[str, Any]:
             if page is None:
                 raise HTTPException(status_code=500, detail="Failed to create page")
 
-            return page
+            return page  # type: ignore[no-any-return]
 
     except HTTPException:
         raise

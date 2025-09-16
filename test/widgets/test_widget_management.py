@@ -1,14 +1,14 @@
 from typing import Any, Dict
 
 from app.storage import (
+    WIDGET_TYPES,
     get_article_template,
     get_available_widgets,
     save_article_template,
-    WIDGET_TYPES,
 )
 
 
-def test_widget_types_defined():
+def test_widget_types_defined() -> None:
     """ウィジェットタイプが正しく定義されていることを確認"""
     expected_widgets = {"properties", "url_context", "kindle", "past_posts", "epub"}
     assert set(WIDGET_TYPES.keys()) == expected_widgets
@@ -21,14 +21,21 @@ def test_widget_types_defined():
         assert len(widget_info["description"]) > 0
 
 
-def test_get_available_widgets():
+def test_get_available_widgets() -> None:
     """利用可能なウィジェット一覧の取得をテスト"""
     widgets = get_available_widgets()
     assert isinstance(widgets, list)
     assert len(widgets) == 6
 
     widget_ids = [w["id"] for w in widgets]
-    assert set(widget_ids) == {"properties", "url_context", "kindle", "past_posts", "epub", "notion"}
+    assert set(widget_ids) == {
+        "properties",
+        "url_context",
+        "kindle",
+        "past_posts",
+        "epub",
+        "notion",
+    }
 
     for widget in widgets:
         assert "id" in widget
@@ -36,7 +43,7 @@ def test_get_available_widgets():
         assert "description" in widget
 
 
-def test_save_template_with_widgets():
+def test_save_template_with_widgets() -> None:
     """ウィジェット付きテンプレートの保存をテスト"""
     payload: Dict[str, Any] = {
         "name": "ウィジェットテスト",
@@ -57,7 +64,7 @@ def test_save_template_with_widgets():
     assert saved["widgets"] == ["url_context", "kindle"]
 
 
-def test_save_template_with_invalid_widgets():
+def test_save_template_with_invalid_widgets() -> None:
     """無効なウィジェットを含むテンプレートの保存をテスト"""
     payload: Dict[str, Any] = {
         "name": "無効ウィジェットテスト",
@@ -74,7 +81,7 @@ def test_save_template_with_invalid_widgets():
     assert result["widgets"] == ["url_context", "kindle"]
 
 
-def test_save_template_with_duplicate_widgets():
+def test_save_template_with_duplicate_widgets() -> None:
     """重複ウィジェットを含むテンプレートの保存をテスト"""
     payload: Dict[str, Any] = {
         "name": "重複ウィジェットテスト",
@@ -91,7 +98,7 @@ def test_save_template_with_duplicate_widgets():
     assert result["widgets"] == ["url_context", "kindle"]
 
 
-def test_save_template_widget_order_preserved():
+def test_save_template_widget_order_preserved() -> None:
     """ウィジェットの順序が保持されることをテスト"""
     payload: Dict[str, Any] = {
         "name": "順序テスト",
@@ -112,7 +119,7 @@ def test_save_template_widget_order_preserved():
     assert saved["widgets"] == ["past_posts", "url_context", "kindle"]
 
 
-def test_template_without_widgets():
+def test_template_without_widgets() -> None:
     """ウィジェットなしのテンプレートの保存をテスト"""
     payload: Dict[str, Any] = {
         "name": "ウィジェットなしテスト",

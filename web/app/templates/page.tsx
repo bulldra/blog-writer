@@ -6,6 +6,7 @@ import {
 	Draggable,
 	type DropResult,
 } from '@hello-pangea/dnd'
+import TemplateList from './TemplateList'
 
 export type Field = {
 	key: string
@@ -36,6 +37,7 @@ export default function TemplatesPage() {
 	const [fields, setFields] = useState<Field[]>([])
 	const [promptText, setPromptText] = useState('')
 	const [saving, setSaving] = useState(false)
+	const [proposing, setProposing] = useState(false)
 	const [error, setError] = useState<string>('')
 	const [availableWidgets, setAvailableWidgets] = useState<Widget[]>([])
 
@@ -168,6 +170,7 @@ export default function TemplatesPage() {
 
 	const aiPropose = async () => {
 		try {
+			setProposing(true)
 			const enabled = widgets
 			const widgetMeta = availableWidgets
 				.filter((w) => enabled.includes(w.id))
@@ -219,7 +222,10 @@ export default function TemplatesPage() {
 				const json = await res.json()
 				setPromptText(String(json.text || ''))
 			}
-		} catch {}
+		} catch {
+		} finally {
+			setProposing(false)
+		}
 	}
 
 	const varsForWidget = (widgetId: string): string[] => {
@@ -419,85 +425,29 @@ export default function TemplatesPage() {
 							+ 追加
 						</button>
 					</div>
-					<ul style={{ listStyle: 'none', padding: 0, margin: 8 }}>
-						{list.map((tpl) => (
-							<li key={tpl.type} style={{ marginBottom: 6 }}>
-								<button
-									onClick={() => setCurrentType(tpl.type)}
-									style={{
-										width: '100%',
-										textAlign: 'left',
-										padding: '6px 8px',
-										background:
-											currentType === tpl.type
-												? '#eef5ff'
-												: '#f9f9f9',
-										border: '1px solid #ddd',
-										cursor: 'pointer',
-									}}>
-									<div style={{ fontWeight: 600 }}>
-										{tpl.name || tpl.type}
-									</div>
-									<div
-										style={{ fontSize: 12, color: '#666' }}>
-										{tpl.type}
-									</div>
-								</button>
-								{!['url', 'note', 'review'].includes(
-									tpl.type
-								) && (
-									<div style={{ marginTop: 4 }}>
-										<button
-											onClick={() => {
-												if (
-													!confirm(
-														`${tpl.type} を削除しますか？`
-													)
-												)
-													return
-												fetch(
-													`${API_BASE}/api/article-templates/${encodeURIComponent(
-														tpl.type
-													)}`,
-													{ method: 'DELETE' }
-												)
-													.then(
-														(r) => r.ok && r.json()
-													)
-													.then(() => {
-														setList((prev) =>
-															prev.filter(
-																(x) =>
-																	x.type !==
-																	tpl.type
-															)
-														)
-														if (
-															currentType ===
-															tpl.type
-														)
-															setCurrentType(
-																'url'
-															)
-													})
-													.catch(() => {})
-											}}
-											style={{
-												fontSize: 12,
-												color: '#a00',
-											}}>
-											削除
-										</button>
-									</div>
-								)}
-							</li>
-						))}
-						{list.length === 0 ? (
-							<li style={{ fontSize: 12, color: '#666' }}>
-								テンプレートが見つかりません
-							</li>
-						) : null}
-					</ul>
+					<TemplateList
+						list={list}
+						currentType={currentType}
+						onSelect={(type) => setCurrentType(type)}
+						onDelete={(type) => {
+							if (!confirm(`${type} を削除しますか？`)) return
+							fetch(
+								`${API_BASE}/api/article-templates/${encodeURIComponent(
+									type
+								)}`,
+								{ method: 'DELETE' }
+							)
+								.then((r) => r.ok && r.json())
+								.then(() => {
+									setList((prev) =>
+										prev.filter((x) => x.type !== type)
+									)
+									if (currentType === type)
+										setCurrentType('url')
+								})
+								.catch(() => {})
+						}}
+					/>
 				</div>
 
 				<div style={{ display: 'grid', gap: 12 }}>
@@ -508,12 +458,18 @@ export default function TemplatesPage() {
 							onChange={(e) => setName(e.target.value)}
 							style={{ flex: 1 }}
 						/>
-						<button onClick={aiPropose}>
-							AIでプロンプト雛形を提案
+						<button onClick={aiPropose} disabled={proposing}>
+							{proposing ? '提案中…' : 'AIでプロンプト雛形を提案'}
 						</button>
 					</div>
 
-					<div>
+					<div
+						style={{
+							opacity: proposing ? 0.6 : 1,
+							pointerEvents: proposing
+								? ('none' as const)
+								: 'auto',
+						}}>
 						<strong>ウィジェット設定</strong>
 						<span className="dnd-hint">
 							ドラッグして順序を入れ替えられます
@@ -539,293 +495,321 @@ export default function TemplatesPage() {
 											padding: 8,
 											marginTop: 4,
 										}}>
-										<DragDropContext onDragEnd={onDragEnd}>
-											<Droppable droppableId="widgets">
-												{(provided, snapshot) => (
-													<div
-														ref={provided.innerRef}
-														{...provided.droppableProps}
-														className={`dnd-list${
-															snapshot.isDraggingOver
-																? ' drag-over'
-																: ''
-														}`}>
-														{widgets.map(
-															(
-																widgetId,
-																index
-															) => {
-																const widget =
-																	availableWidgets.find(
-																		(w) =>
-																			w.id ===
-																			widgetId
-																	)
-																return (
-																	<Draggable
-																		key={
-																			widgetId
-																		}
-																		draggableId={
-																			widgetId
-																		}
-																		index={
-																			index
-																		}>
-																		{(
-																			dragProvided,
-																			dragSnapshot
-																		) => (
-																			<div
-																				ref={
-																					dragProvided.innerRef
-																				}
-																				{...dragProvided.draggableProps}
-																				className={`dnd-item${
-																					dragSnapshot.isDragging
-																						? ' dragging'
-																						: ''
-																				}`}>
-																				<span
-																					{...dragProvided.dragHandleProps}
-																					className="dnd-handle"
-																					title="ドラッグして移動"
-																					aria-label="ドラッグハンドル">
-																					≡
-																				</span>
-																				<div className="dnd-item-main">
-																					<div
-																						style={{
-																							flex: 1,
-																						}}>
-																						<strong>
-																							{widget
-																								? widget.name
-																								: widgetId}
-																						</strong>
-																						{(() => {
-																							const vs =
-																								varsForWidget(
-																									widgetId
+										<div
+											style={{
+												opacity: proposing ? 0.6 : 1,
+												pointerEvents: proposing
+													? ('none' as const)
+													: 'auto',
+											}}>
+											<DragDropContext
+												onDragEnd={onDragEnd}>
+												<Droppable droppableId="widgets">
+													{(provided, snapshot) => (
+														<div
+															ref={
+																provided.innerRef
+															}
+															{...provided.droppableProps}
+															className={`dnd-list${
+																snapshot.isDraggingOver
+																	? ' drag-over'
+																	: ''
+															}`}>
+															{widgets.map(
+																(
+																	widgetId,
+																	index
+																) => {
+																	const widget =
+																		availableWidgets.find(
+																			(
+																				w
+																			) =>
+																				w.id ===
+																				widgetId
+																		)
+																	return (
+																		<Draggable
+																			key={
+																				widgetId
+																			}
+																			draggableId={
+																				widgetId
+																			}
+																			index={
+																				index
+																			}>
+																			{(
+																				dragProvided,
+																				dragSnapshot
+																			) => (
+																				<div
+																					ref={
+																						dragProvided.innerRef
+																					}
+																					{...dragProvided.draggableProps}
+																					className={`dnd-item${
+																						dragSnapshot.isDragging
+																							? ' dragging'
+																							: ''
+																					}`}>
+																					<span
+																						{...dragProvided.dragHandleProps}
+																						className="dnd-handle"
+																						title="ドラッグして移動"
+																						aria-label="ドラッグハンドル">
+																						≡
+																					</span>
+																					<div className="dnd-item-main">
+																						<div
+																							style={{
+																								display:
+																									'flex',
+																								gap: 8,
+																								alignItems:
+																									'center',
+																							}}>
+																							<strong
+																								style={{
+																									flex: 1,
+																								}}>
+																								{widget
+																									? widget.name
+																									: widgetId}
+																							</strong>
+																							{(() => {
+																								const vs =
+																									varsForWidget(
+																										widgetId
+																									)
+																								if (
+																									vs.length ===
+																									0
 																								)
-																							if (
-																								vs.length ===
-																								0
-																							)
-																								return null
-																							return (
+																									return null
+																								return (
+																									<div
+																										style={{
+																											display:
+																												'flex',
+																											gap: 6,
+																											flexWrap:
+																												'wrap',
+																										}}>
+																										{vs.map(
+																											(
+																												v
+																											) => (
+																												<button
+																													key={
+																														v
+																													}
+																													onClick={() =>
+																														insertVariableFromSuggest(
+																															v
+																														)
+																													}
+																													style={{
+																														fontSize: 11,
+																														background:
+																															'#eef',
+																														border: '1px solid #ccd',
+																														padding:
+																															'1px 6px',
+																														borderRadius: 10,
+																														cursor: 'pointer',
+																													}}
+																													title="変数を挿入">
+																													@
+																													{
+																														v
+																													}
+																												</button>
+																											)
+																										)}
+																									</div>
+																								)
+																							})()}
+																							{widget && (
 																								<div
 																									style={{
-																										marginTop: 4,
-																										display:
-																											'flex',
-																										gap: 6,
-																										flexWrap:
-																											'wrap',
+																										fontSize: 12,
+																										color: '#666',
 																									}}>
-																									{vs.map(
+																									{
+																										widget.description
+																									}
+																								</div>
+																							)}
+																							{widgetId ===
+																								'properties' && (
+																								<div
+																									style={{
+																										marginTop: 8,
+																										display:
+																											'grid',
+																										gap: 8,
+																									}}>
+																									{fields.map(
 																										(
-																											v
+																											f,
+																											i
 																										) => (
-																											<span
+																											<div
 																												key={
-																													v
+																													i
 																												}
 																												style={{
-																													fontSize: 11,
-																													background:
-																														'#eef',
-																													border: '1px solid #ccd',
-																													padding:
-																														'1px 6px',
-																													borderRadius: 10,
+																													display:
+																														'flex',
+																													gap: 6,
 																												}}>
-																												@
-																												{
-																													v
-																												}
-																											</span>
+																												<input
+																													placeholder="キー (英数字/スネーク推奨)"
+																													value={
+																														f.key
+																													}
+																													onChange={(
+																														e
+																													) =>
+																														updateField(
+																															i,
+																															'key',
+																															e
+																																.target
+																																.value
+																														)
+																													}
+																													style={{
+																														width: 200,
+																													}}
+																												/>
+																												<input
+																													placeholder="ラベル"
+																													value={
+																														f.label
+																													}
+																													onChange={(
+																														e
+																													) =>
+																														updateField(
+																															i,
+																															'label',
+																															e
+																																.target
+																																.value
+																														)
+																													}
+																													style={{
+																														flex: 1,
+																													}}
+																												/>
+																												<select
+																													value={
+																														f.input_type
+																													}
+																													onChange={(
+																														e
+																													) =>
+																														updateField(
+																															i,
+																															'input_type',
+																															e
+																																.target
+																																.value as Field['input_type']
+																														)
+																													}>
+																													<option value="text">
+																														テキスト
+																													</option>
+																													<option value="textarea">
+																														複数行
+																													</option>
+																												</select>
+																												<button
+																													onClick={() =>
+																														removeField(
+																															i
+																														)
+																													}
+																													style={{
+																														color: '#a00',
+																													}}>
+																													削除
+																												</button>
+																											</div>
 																										)
 																									)}
+																									<div>
+																										<button
+																											onClick={
+																												addField
+																											}>
+																											+
+																											項目を追加
+																										</button>
+																										{fields.length ===
+																											0 && (
+																											<span
+																												style={{
+																													color: '#666',
+																													fontSize: 12,
+																													marginLeft: 8,
+																												}}>
+																												入力項目は任意です。
+																											</span>
+																										)}
+																									</div>
 																								</div>
-																							)
-																						})()}
-																						{widget && (
-																							<div
+																							)}
+																						</div>
+																						<div
+																							style={{
+																								display:
+																									'flex',
+																								gap: 4,
+																							}}>
+																							<button
+																								onClick={() =>
+																									setWidgets(
+																										(
+																											prev
+																										) =>
+																											prev.filter(
+																												(
+																													id
+																												) =>
+																													id !==
+																													widgetId
+																											)
+																									)
+																								}
 																								style={{
 																									fontSize: 12,
-																									color: '#666',
-																								}}>
-																								{
-																									widget.description
-																								}
-																							</div>
-																						)}
-																						{widgetId ===
-																							'properties' && (
-																							<div
-																								style={{
-																									marginTop: 8,
-																									display:
-																										'grid',
-																									gap: 8,
-																								}}>
-																								{fields.map(
-																									(
-																										f,
-																										i
-																									) => (
-																										<div
-																											key={
-																												i
-																											}
-																											style={{
-																												display:
-																													'flex',
-																												gap: 6,
-																											}}>
-																											<input
-																												placeholder="キー (英数字/スネーク推奨)"
-																												value={
-																													f.key
-																												}
-																												onChange={(
-																													e
-																												) =>
-																													updateField(
-																														i,
-																														'key',
-																														e
-																															.target
-																															.value
-																													)
-																												}
-																												style={{
-																													width: 200,
-																												}}
-																											/>
-																											<input
-																												placeholder="ラベル"
-																												value={
-																													f.label
-																												}
-																												onChange={(
-																													e
-																												) =>
-																													updateField(
-																														i,
-																														'label',
-																														e
-																															.target
-																															.value
-																													)
-																												}
-																												style={{
-																													flex: 1,
-																												}}
-																											/>
-																											<select
-																												value={
-																													f.input_type
-																												}
-																												onChange={(
-																													e
-																												) =>
-																													updateField(
-																														i,
-																														'input_type',
-																														e
-																															.target
-																															.value as Field['input_type']
-																													)
-																												}>
-																												<option value="text">
-																													テキスト
-																												</option>
-																												<option value="textarea">
-																													複数行
-																												</option>
-																											</select>
-																											<button
-																												onClick={() =>
-																													removeField(
-																														i
-																													)
-																												}
-																												style={{
-																													color: '#a00',
-																												}}>
-																												削除
-																											</button>
-																										</div>
-																									)
-																								)}
-																								<div>
-																									<button
-																										onClick={
-																											addField
-																										}>
-																										+
-																										項目を追加
-																									</button>
-																									{fields.length ===
-																										0 && (
-																										<span
-																											style={{
-																												color: '#666',
-																												fontSize: 12,
-																												marginLeft: 8,
-																											}}>
-																											入力項目は任意です。
-																										</span>
-																									)}
-																								</div>
-																							</div>
-																						)}
-																					</div>
-																					<div
-																						style={{
-																							display:
-																								'flex',
-																							gap: 4,
-																						}}>
-																						<button
-																							onClick={() =>
-																								setWidgets(
-																									(
-																										prev
-																									) =>
-																										prev.filter(
-																											(
-																												id
-																											) =>
-																												id !==
-																												widgetId
-																										)
-																								)
-																							}
-																							style={{
-																								fontSize: 12,
-																								padding:
-																									'2px 6px',
-																								color: '#a00',
-																							}}
-																							title="削除">
-																							削除
-																						</button>
+																									padding:
+																										'2px 6px',
+																									color: '#a00',
+																								}}
+																								title="削除">
+																								削除
+																							</button>
+																						</div>
 																					</div>
 																				</div>
-																			</div>
-																		)}
-																	</Draggable>
-																)
+																			)}
+																		</Draggable>
+																	)
+																}
+															)}
+															{
+																provided.placeholder
 															}
-														)}
-														{provided.placeholder}
-													</div>
-												)}
-											</Droppable>
-										</DragDropContext>
+														</div>
+													)}
+												</Droppable>
+											</DragDropContext>
+										</div>
 									</div>
 								)}
 							</div>
@@ -905,8 +889,10 @@ export default function TemplatesPage() {
 								marginTop: 6,
 								flexWrap: 'wrap',
 							}}>
-							<button onClick={aiPropose}>
-								ウィジェットに基づき提案
+							<button onClick={aiPropose} disabled={proposing}>
+								{proposing
+									? '提案中…'
+									: 'ウィジェットに基づき提案'}
 							</button>
 						</div>
 						<textarea

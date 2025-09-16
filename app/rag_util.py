@@ -130,7 +130,7 @@ class RAGManager:
 
         # キャッシュディレクトリから検索
         index_path = self.cache_dir / f"{book_name}.index"
-        if index_path.with_suffix(".faiss").exists():
+        if index_path.with_suffix(".pkl").exists():
             success = self.embedding_manager.load_index(index_path)
             if success:
                 self.book_indices[book_name] = str(index_path)
@@ -176,10 +176,11 @@ class RAGManager:
         available_books = list(self.book_indices.keys())
 
         # キャッシュディレクトリから追加の書籍を探索
-        for index_file in self.cache_dir.glob("*.faiss"):
-            book_name = index_file.stem
-            if book_name not in available_books:
-                available_books.append(book_name)
+        for index_file in self.cache_dir.glob("*.pkl"):
+            if index_file.stem.endswith(".index"):
+                book_name = index_file.stem[:-6]  # ".index"を除去
+                if book_name not in available_books:
+                    available_books.append(book_name)
 
         for book_name in available_books:
             try:
@@ -201,8 +202,10 @@ class RAGManager:
         books = set(self.book_indices.keys())
 
         # キャッシュディレクトリから追加
-        for index_file in self.cache_dir.glob("*.faiss"):
-            books.add(index_file.stem)
+        for index_file in self.cache_dir.glob("*.pkl"):
+            if index_file.stem.endswith(".index"):
+                book_name = index_file.stem[:-6]  # ".index"を除去
+                books.add(book_name)
 
         return sorted(list(books))
 
@@ -223,11 +226,8 @@ class RAGManager:
                 index_path = self.cache_dir / f"{book_name}.index"
 
             # ファイルを削除
-            faiss_file = index_path.with_suffix(".faiss")
             pkl_file = index_path.with_suffix(".pkl")
 
-            if faiss_file.exists():
-                faiss_file.unlink()
             if pkl_file.exists():
                 pkl_file.unlink()
 
