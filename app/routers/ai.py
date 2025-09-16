@@ -10,7 +10,13 @@ from google import genai as genai_client
 from google.genai import types as genai_types
 from pydantic import BaseModel
 
-from app.ai_utils import apply_prompt_template, build_bullets_prompt, extract_text
+from app.ai_utils import (
+    apply_prompt_template, 
+    build_bullets_prompt, 
+    extract_text, 
+    generate_rag_query,
+    inject_rag_context
+)
 from app.security import decrypt_text, encrypt_text, is_url_allowed
 from app.storage import get_ai_settings, save_ai_settings
 
@@ -38,6 +44,9 @@ class GenerateRequest(BaseModel):
     model: Optional[str] = None
     url_context: Optional[str] = None
     highlights: Optional[List[str]] = None
+    enable_rag: bool = False
+    rag_book_name: Optional[str] = None
+    title: Optional[str] = None
 
 
 @router.get("/settings")
@@ -140,6 +149,7 @@ async def _fetch_url_context(url: str) -> Tuple[Optional[str], Optional[str]]:
 
 
 @router.post("/generate")
+@router.post("/generate")
 async def generate(req: GenerateRequest):
     row = get_ai_settings()
     provider = str(row.get("provider", "gemini"))
@@ -147,13 +157,52 @@ async def generate(req: GenerateRequest):
     max_len = int(row.get("max_prompt_len", 32768))
     app_secret = os.getenv("APP_SECRET")
 
+    # RAG検索の実行（プロンプト生成前）
+    rag_context = ""
+    if req.enable_rag:
+        try:
+            from app.routers.epub import get_rag_manager
+            rag_manager = get_rag_manager()
+            
+            # 検索クエリを生成
+            search_query = generate_rag_query(req.prompt, req.title)
+            _logger.info(f"RAG検索クエリ: {search_query}")
+            
+            if search_query.strip():
+                if req.rag_book_name:
+                    # 特定の書籍で検索
+                    results = rag_manager.search_in_book(req.rag_book_name, search_query, 5, 0.1)
+                    rag_context = rag_manager.format_search_results(results)
+                else:
+                    # 全書籍で検索
+                    all_results = rag_manager.search_all_books(search_query, 3, 0.1)
+                    # 結果を統合
+                    combined_results = []
+                    for book_results in all_results.values():
+                        combined_results.extend(book_results)
+                    # スコア順でソートして上位5件
+                    combined_results.sort(key=lambda x: x[2], reverse=True)
+                    rag_context = rag_manager.format_search_results(combined_results[:5])
+                
+                _logger.info(f"RAG検索結果取得: {len(rag_context)}文字")
+        except Exception as e:
+            _logger.warning(f"RAG検索エラー: {e}")
+            rag_context = ""
+
+    # プロンプトの基本処理
+    base_prompt = (req.prompt or "")[:max_len]
+    
+    # RAGコンテキストを注入
+    if rag_context:
+        base_prompt = inject_rag_context(base_prompt, rag_context)
+
     # LM Studio: OpenAI互換API（/v1/chat/completions）
     if provider == "lmstudio":
         base = decrypt_text(str(row.get("api_key", "")), app_secret) or os.getenv(
             "LMSTUDIO_BASE", "http://localhost:1234/v1"
         )
         url = (base.rstrip("/")) + "/chat/completions"
-        prompt = (req.prompt or "")[:max_len]
+        prompt = base_prompt
         if req.url_context:
             ctx, err = await _fetch_url_context(req.url_context)
             if ctx:
@@ -197,8 +246,8 @@ async def generate(req: GenerateRequest):
     if model_name not in ALLOWED_MODELS:
         model_name = "gemini-2.5-flash"
     if not api_key:
-        return {"text": f"[stub] {req.prompt}"}
-    prompt = (req.prompt or "")[:max_len]
+        return {"text": f"[stub] {base_prompt}"}
+    prompt = base_prompt
     try:
         gclient = genai_client.Client(api_key=api_key)
         tools = _build_tools(enable_search=True, enable_url=bool(req.url_context))
@@ -227,12 +276,12 @@ async def generate(req: GenerateRequest):
             prompt = (
                 "次のURL本文を参考に回答してください。まず要点を整理し、続いて求められた出力を生成してください。\n"
                 f"URL: {req.url_context}\n\n"
-                f"[URL本文]\n{ctx}\n\n[依頼]\n{req.prompt}"
+                f"[URL本文]\n{ctx}\n\n[依頼]\n{base_prompt}"
             )
         elif err:
             prompt = (
                 "次のURLの内容を参考にしつつ回答してください。本文取得に失敗した場合は一般知識で補ってください。\n"
-                f"URL: {req.url_context}\n\n{req.prompt}"
+                f"URL: {req.url_context}\n\n{base_prompt}"
             )
     gclient = genai_client.Client(api_key=api_key)
     resp3 = gclient.models.generate_content(model=model_name, contents=prompt[:max_len])

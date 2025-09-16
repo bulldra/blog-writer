@@ -13,6 +13,7 @@ DRAFTS_FILE = DATA_DIR / "drafts.json"
 PHRASES_FILE = DATA_DIR / "phrases.json"
 GENERATION_HISTORY_FILE = DATA_DIR / "generation_history.json"
 POSTS_DIR = DATA_DIR / "posts"
+EPUB_CACHE_DIR = DATA_DIR / "epub_cache"
 
 _lock = threading.Lock()
 
@@ -58,6 +59,7 @@ def init_storage() -> None:
         if not GENERATION_HISTORY_FILE.exists():
             _atomic_write(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
     POSTS_DIR.mkdir(parents=True, exist_ok=True)
+    EPUB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_ai_settings() -> Dict[str, Any]:
@@ -484,6 +486,11 @@ WIDGET_TYPES = {
         "name": "過去記事",
         "description": "過去に書いた記事の内容を参考にして記事を作成します",
     },
+    "epub": {
+        "id": "epub",
+        "name": "EPUB書籍検索",
+        "description": "EPUBファイルからベクトル検索でRAG機能を提供し、書籍内容を記事作成の参考にします",
+    },
 }
 
 _ALLOWED_WIDGETS = set(WIDGET_TYPES.keys())
@@ -773,3 +780,43 @@ def delete_generation_history(history_id: int) -> bool:
         data["items"] = new_items
         _atomic_write(GENERATION_HISTORY_FILE, data)
         return True
+
+
+def get_epub_settings() -> Dict[str, Any]:
+    """EPUB設定を取得する"""
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        epub_config = data.get("epub", {})
+        return {
+            "epub_directory": str(epub_config.get("epub_directory", "")),
+            "embedding_model": str(epub_config.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")),
+            "chunk_size": int(epub_config.get("chunk_size", 500)),
+            "overlap_size": int(epub_config.get("overlap_size", 50)),
+            "search_top_k": int(epub_config.get("search_top_k", 5)),
+            "min_similarity_score": float(epub_config.get("min_similarity_score", 0.1))
+        }
+
+
+def save_epub_settings(
+    epub_directory: str = "",
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+    chunk_size: int = 500,
+    overlap_size: int = 50,
+    search_top_k: int = 5,
+    min_similarity_score: float = 0.1
+) -> None:
+    """EPUB設定を保存する"""
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        
+        epub_config = {
+            "epub_directory": str(epub_directory),
+            "embedding_model": str(embedding_model),
+            "chunk_size": max(100, min(2000, int(chunk_size))),
+            "overlap_size": max(0, min(500, int(overlap_size))),
+            "search_top_k": max(1, min(20, int(search_top_k))),
+            "min_similarity_score": max(0.0, min(1.0, float(min_similarity_score)))
+        }
+        
+        data["epub"] = epub_config
+        _atomic_write(SETTINGS_FILE, data)

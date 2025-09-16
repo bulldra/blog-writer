@@ -14,6 +14,10 @@ dependencies = [
 	"python-jose[cryptography]>=3.3.0",
 	"authlib>=1.2.0",
 	"itsdangerous>=2.1.0",
+	"ebooklib>=0.19",
+	"faiss-cpu>=1.12.0",
+	"sentence-transformers>=5.1.0",
+	"beautifulsoup4>=4.12.0",
 ]
 
 [tool.uv]
