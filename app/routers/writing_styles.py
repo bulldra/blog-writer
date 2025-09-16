@@ -1,10 +1,15 @@
 """文体テンプレート管理のAPIエンドポイント"""
+
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from app.ai_utils import analyze_writing_style
+from app.markdown_util import (
+    generate_writing_style_markdown,
+    generate_style_comparison_markdown,
+)
 from app.storage import (
     delete_writing_style,
     get_writing_style,
@@ -60,15 +65,43 @@ async def analyze_text(req: AnalyzeRequest):
     """文章を分析して文体の特徴を抽出"""
     if not req.text or len(req.text.strip()) < 50:
         raise HTTPException(
-            status_code=400, 
-            detail="Text must be at least 50 characters long"
+            status_code=400, detail="Text must be at least 50 characters long"
         )
-    
+
     result = await analyze_writing_style(req.text)
     if result is None:
-        raise HTTPException(
-            status_code=500, 
-            detail="Failed to analyze writing style"
-        )
-    
+        raise HTTPException(status_code=500, detail="Failed to analyze writing style")
+
     return {"analysis": result}
+
+
+@router.get("/{style_id}/markdown")
+def get_style_markdown(style_id: str):
+    """文体テンプレートのMarkdownファイルを生成"""
+    style = get_writing_style(style_id)
+    if not style:
+        raise HTTPException(status_code=404, detail="Writing style not found")
+
+    markdown_content = generate_writing_style_markdown(style)
+    filename = f"{style['name']}.md"
+
+    return Response(
+        content=markdown_content,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/export/comparison")
+def export_comparison_markdown():
+    """全文体テンプレートの比較表をMarkdownで生成"""
+    styles = list_writing_styles()
+    markdown_content = generate_style_comparison_markdown(styles)
+
+    return Response(
+        content=markdown_content,
+        media_type="text/markdown",
+        headers={
+            "Content-Disposition": "attachment; filename=writing_styles_comparison.md"
+        },
+    )

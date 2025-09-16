@@ -90,61 +90,61 @@ def build_bullets_prompt(req: BulletsParams, bullets: List[str]) -> str:
 
 def generate_rag_query(prompt: str, title: Optional[str] = None) -> str:
     """プロンプトからRAG検索用のクエリを生成
-    
+
     Args:
         prompt: 生成プロンプト
         title: タイトル（オプション）
-        
+
     Returns:
         RAG検索用のクエリ文字列
     """
     # プロンプトから検索に有用なキーワードを抽出
     search_terms = []
-    
+
     # タイトルがある場合は追加
     if title:
         search_terms.append(title)
-    
+
     # プロンプトから重要な名詞や概念を抽出（簡易的な実装）
-    import_terms = re.findall(r'[一-龯ぁ-ゟァ-ヾ]+', prompt)
+    import_terms = re.findall(r"[一-龯ぁ-ゟァ-ヾ]+", prompt)
     meaningful_terms = [term for term in import_terms if len(term) >= 2]
-    
+
     # 重複を除去して上位5つまで
     unique_terms = list(dict.fromkeys(meaningful_terms))[:5]
     search_terms.extend(unique_terms)
-    
+
     # 検索クエリとして結合
     query = " ".join(search_terms)
-    
+
     # 最大100文字に制限
     if len(query) > 100:
         query = query[:100]
-    
+
     return query.strip()
 
 
 def inject_rag_context(prompt: str, rag_context: str) -> str:
     """プロンプトにRAGコンテキストを注入
-    
+
     Args:
         prompt: 元のプロンプト
         rag_context: RAG検索結果のコンテキスト
-        
+
     Returns:
         RAGコンテキストが注入されたプロンプト
     """
     if not rag_context or rag_context.strip() == "関連する情報が見つかりませんでした。":
         return prompt
-    
+
     # RAGコンテキストをプロンプトに挿入
     rag_section = f"\n\n[参考情報]\n{rag_context}\n\n上記の参考情報も踏まえて、"
-    
+
     # プロンプトの最初の指示文の後に挿入
     if "してください。" in prompt:
         parts = prompt.split("してください。", 1)
         if len(parts) == 2:
             return parts[0] + "してください。" + rag_section + parts[1]
-    
+
     # デフォルトでは先頭に追加
     return rag_section + prompt
 
@@ -152,19 +152,19 @@ def inject_rag_context(prompt: str, rag_context: str) -> str:
 async def analyze_writing_style(text: str) -> Optional[dict]:
     """
     文章を分析して文体の特徴を抽出する
-    
+
     Args:
         text: 分析対象の文章
-        
+
     Returns:
         文体の特徴を表すdict、分析できない場合はNone
     """
     import json
-    
+
     # 最小限の文字数チェック
     if not text or len(text.strip()) < 50:
         return None
-    
+
     prompt = f"""
 以下の文章を分析して、文体の特徴を抽出してください。
 分析結果は以下のようなJSON形式で出力してください：
@@ -185,26 +185,26 @@ async def analyze_writing_style(text: str) -> Optional[dict]:
 
 上記の文章の文体を分析し、JSON形式のみで回答してください。説明文は不要です。
 """
-    
+
     try:
         # ai.pyのgenerate関数を使用するためのリクエストを作成
         from app.routers.ai import GenerateRequest, generate
-        
+
         request = GenerateRequest(prompt=prompt)
         response = await generate(request)
-        
+
         result_text = response.get("text", "")
         if not result_text or "[stub" in result_text:
             return None
-            
+
         # JSON部分を抽出
         result_text = result_text.strip()
         if result_text.startswith("```json"):
             result_text = result_text.replace("```json", "").replace("```", "").strip()
         elif result_text.startswith("```"):
             result_text = result_text.replace("```", "").strip()
-            
+
         return json.loads(result_text)
-        
+
     except Exception:
         return None

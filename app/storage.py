@@ -792,11 +792,15 @@ def get_epub_settings() -> Dict[str, Any]:
         epub_config = data.get("epub", {})
         return {
             "epub_directory": str(epub_config.get("epub_directory", "")),
-            "embedding_model": str(epub_config.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")),
+            "embedding_model": str(
+                epub_config.get(
+                    "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
+                )
+            ),
             "chunk_size": int(epub_config.get("chunk_size", 500)),
             "overlap_size": int(epub_config.get("overlap_size", 50)),
             "search_top_k": int(epub_config.get("search_top_k", 5)),
-            "min_similarity_score": float(epub_config.get("min_similarity_score", 0.1))
+            "min_similarity_score": float(epub_config.get("min_similarity_score", 0.1)),
         }
 
 
@@ -806,55 +810,61 @@ def save_epub_settings(
     chunk_size: int = 500,
     overlap_size: int = 50,
     search_top_k: int = 5,
-    min_similarity_score: float = 0.1
+    min_similarity_score: float = 0.1,
 ) -> None:
     """EPUB設定を保存する"""
     with _lock:
         data = _read_json(SETTINGS_FILE, {})
-        
+
         epub_config = {
             "epub_directory": str(epub_directory),
             "embedding_model": str(embedding_model),
             "chunk_size": max(100, min(2000, int(chunk_size))),
             "overlap_size": max(0, min(500, int(overlap_size))),
             "search_top_k": max(1, min(20, int(search_top_k))),
-            "min_similarity_score": max(0.0, min(1.0, float(min_similarity_score)))
+            "min_similarity_score": max(0.0, min(1.0, float(min_similarity_score))),
         }
-        
+
         data["epub"] = epub_config
         _atomic_write(SETTINGS_FILE, data)
 
 
-def save_writing_style(style_id: str, style_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def save_writing_style(
+    style_id: str, style_data: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
     """文体テンプレートを保存する"""
     with _lock:
         data = _read_json(WRITING_STYLES_FILE, {"items": {}})
-        
+
         # バリデーション
         if not isinstance(style_data, dict):
             return None
-        
+
         # 必須フィールドのチェック
         required_fields = ["name", "properties", "source_text", "description"]
         for field in required_fields:
             if field not in style_data:
                 return None
-        
+
         # タイムスタンプ付きで保存
         now_str = datetime.now(UTC).isoformat()
         style_item = {
             "id": style_id,
             "name": str(style_data["name"]),
-            "properties": dict(style_data["properties"]) if isinstance(style_data["properties"], dict) else {},
+            "properties": (
+                dict(style_data["properties"])
+                if isinstance(style_data["properties"], dict)
+                else {}
+            ),
             "source_text": str(style_data["source_text"]),
             "description": str(style_data["description"]),
             "created_at": style_data.get("created_at", now_str),
             "updated_at": now_str,
         }
-        
+
         data["items"][style_id] = style_item
         _atomic_write(WRITING_STYLES_FILE, data)
-        
+
         return style_item
 
 
@@ -881,7 +891,7 @@ def delete_writing_style(style_id: str) -> bool:
         data = _read_json(WRITING_STYLES_FILE, {"items": {}})
         if style_id not in data["items"]:
             return False
-        
+
         del data["items"][style_id]
         _atomic_write(WRITING_STYLES_FILE, data)
         return True
