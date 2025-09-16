@@ -14,6 +14,7 @@ from app.routers import images as images_router
 from app.routers import migrations as migrations_router
 from app.routers import obsidian as obsidian_router
 from app.routers import templates as templates_router
+from app.routers import writing_styles as writing_styles_router
 from app.storage import init_storage
 
 
@@ -100,6 +101,11 @@ def create_app() -> FastAPI:
         generation_history_router.router,
         prefix="/api/generation-history",
         tags=["generation-history"],
+    )
+    app.include_router(
+        writing_styles_router.router,
+        prefix="/api/writing-styles",
+        tags=["writing-styles"],
     )
 
     @app.get("/api/health")

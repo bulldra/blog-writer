@@ -147,3 +147,64 @@ def inject_rag_context(prompt: str, rag_context: str) -> str:
 
     # デフォルトでは先頭に追加
     return rag_section + prompt
+
+
+async def analyze_writing_style(text: str) -> Optional[dict]:
+    """
+    文章を分析して文体の特徴を抽出する
+
+    Args:
+        text: 分析対象の文章
+
+    Returns:
+        文体の特徴を表すdict、分析できない場合はNone
+    """
+    import json
+
+    # 最小限の文字数チェック
+    if not text or len(text.strip()) < 50:
+        return None
+
+    prompt = f"""
+以下の文章を分析して、文体の特徴を抽出してください。
+分析結果は以下のようなJSON形式で出力してください：
+
+{{
+    "tone": "文章の基調（例：フレンドリー、丁寧、カジュアル、フォーマル）",
+    "formality": "敬語レベル（例：カジュアル、フォーマル、超フォーマル）",
+    "length_preference": "文章の長さ傾向（例：簡潔、標準、詳細）",
+    "target_audience": "想定読者層（例：一般、専門家、若者、ビジネス）",
+    "writing_style": "文章スタイル（例：親しみやすい、説明的、論理的、感情的）",
+    "sentence_structure": "文構造（例：短文中心、複文多用、バランス型）",
+    "vocabulary_level": "語彙レベル（例：日常語、専門語、文語的）",
+    "emotional_expression": "感情表現（例：明るく積極的、落ち着いた、熱心、冷静）"
+}}
+
+分析対象文章：
+{text}
+
+上記の文章の文体を分析し、JSON形式のみで回答してください。説明文は不要です。
+"""
+
+    try:
+        # ai.pyのgenerate関数を使用するためのリクエストを作成
+        from app.routers.ai import GenerateRequest, generate
+
+        request = GenerateRequest(prompt=prompt)
+        response = await generate(request)
+
+        result_text = response.get("text", "")
+        if not result_text or "[stub" in result_text:
+            return None
+
+        # JSON部分を抽出
+        result_text = result_text.strip()
+        if result_text.startswith("```json"):
+            result_text = result_text.replace("```json", "").replace("```", "").strip()
+        elif result_text.startswith("```"):
+            result_text = result_text.replace("```", "").strip()
+
+        return json.loads(result_text)
+
+    except Exception:
+        return None
