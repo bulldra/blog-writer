@@ -1,6 +1,6 @@
 """テスト用ヘルパー関数とユーティリティ"""
 
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from fastapi.testclient import TestClient
 
@@ -14,7 +14,7 @@ def create_test_client() -> TestClient:
 
 
 def assert_error_response(
-    response, expected_status: int, expected_detail_contains: str = None
+    response, expected_status: int, expected_detail_contains: Optional[str] = None
 ):
     """エラーレスポンスの検証"""
     assert response.status_code == expected_status
@@ -56,7 +56,9 @@ class TestDataFactory:
 
     @staticmethod
     def article_template(
-        name: str = "テストテンプレート", fields: list = None, widgets: list = None
+        name: str = "テストテンプレート",
+        fields: Optional[List[Dict[str, Any]]] = None,
+        widgets: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """記事テンプレートのテストデータを生成"""
         if fields is None:
@@ -76,7 +78,7 @@ class TestDataFactory:
 
     @staticmethod
     def writing_style(
-        name: str = "テスト文体", properties: Dict[str, str] = None
+        name: str = "テスト文体", properties: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
         """文体のテストデータを生成"""
         if properties is None:

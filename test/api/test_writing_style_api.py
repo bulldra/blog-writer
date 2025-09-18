@@ -1,7 +1,7 @@
 """文体テンプレートAPIのテスト"""
 
-from test.helpers.api import validate_writing_style_response
-from test.helpers.common import TestDataFactory
+from ..helpers.api import validate_writing_style_response
+from ..helpers.common import TestDataFactory
 
 
 def test_list_writing_styles_empty(client, temp_data_dir):

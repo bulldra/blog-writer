@@ -25,9 +25,9 @@ def test_theme_toggle_component_exists():
         base, "web", "app", "components", "ThemeToggle.tsx"
     )
 
-    assert os.path.exists(
-        theme_provider_path
-    ), "ThemeProvider コンポーネントが存在しません"
+    assert os.path.exists(theme_provider_path), (
+        "ThemeProvider コンポーネントが存在しません"
+    )
     assert os.path.exists(theme_toggle_path), "ThemeToggle コンポーネントが存在しません"
 
 
@@ -49,9 +49,9 @@ def test_css_variables_defined():
     assert "--text-color:" in css_content, "テキスト色の CSS変数が定義されていません"
 
     # ダークテーマの変数が定義されているかチェック
-    assert (
-        "[data-theme='dark']" in css_content
-    ), "ダークテーマの CSS変数が定義されていません"
+    assert "[data-theme='dark']" in css_content, (
+        "ダークテーマの CSS変数が定義されていません"
+    )
 
 
 def test_layout_includes_theme_provider():
@@ -67,12 +67,12 @@ def test_layout_includes_theme_provider():
     with open(layout_path, "r", encoding="utf-8") as f:
         layout_content = f.read()
 
-    assert (
-        "ThemeProvider" in layout_content
-    ), "レイアウトに ThemeProvider が含まれていません"
-    assert (
-        "import { ThemeProvider }" in layout_content
-    ), "ThemeProvider がインポートされていません"
+    assert "ThemeProvider" in layout_content, (
+        "レイアウトに ThemeProvider が含まれていません"
+    )
+    assert "import { ThemeProvider }" in layout_content, (
+        "ThemeProvider がインポートされていません"
+    )
 
 
 def test_settings_page_includes_theme_toggle():
@@ -88,10 +88,10 @@ def test_settings_page_includes_theme_toggle():
     with open(settings_path, "r", encoding="utf-8") as f:
         settings_content = f.read()
 
-    assert (
-        "ThemeToggle" in settings_content
-    ), "設定ページに ThemeToggle が含まれていません"
-    assert (
-        "import ThemeToggle" in settings_content
-    ), "ThemeToggle がインポートされていません"
+    assert "ThemeToggle" in settings_content, (
+        "設定ページに ThemeToggle が含まれていません"
+    )
+    assert "import ThemeToggle" in settings_content, (
+        "ThemeToggle がインポートされていません"
+    )
     assert "テーマ設定" in settings_content, "テーマ設定セクションが存在しません"

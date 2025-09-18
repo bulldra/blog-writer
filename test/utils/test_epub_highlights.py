@@ -64,9 +64,7 @@ def test_create_highlight(mock_db, sample_highlight_data):
 
 def test_get_highlights_empty(mock_db):
     """空のハイライト一覧取得テスト"""
-    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = (
-        []
-    )
+    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
 
     result = get_highlights(db=mock_db)
 
@@ -198,9 +196,7 @@ def test_get_selected_highlights_for_context(mock_db):
 
 def test_get_selected_highlights_empty_context(mock_db):
     """空のコンテキスト用ハイライト取得テスト"""
-    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = (
-        []
-    )
+    mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
 
     result = get_selected_highlights_for_context(mock_db)
 

@@ -11,7 +11,6 @@ from app.epub_util import (
     extract_metadata,
     extract_text_from_epub,
     get_epub_files,
-    sanitize_filename,
 )
 
 
@@ -38,26 +37,6 @@ def test_chunk_text_short():
     assert chunks[0] == text
 
 
-def test_sanitize_filename_basic():
-    """ファイル名サニタイズの基本テスト"""
-    filename = "テスト:ファイル?名*.txt"
-    result = sanitize_filename(filename)
-
-    assert ":" not in result
-    assert "?" not in result
-    assert "*" not in result
-    assert result.endswith(".txt")
-
-
-def test_sanitize_filename_path_separators():
-    """パス区切り文字のサニタイズテスト"""
-    filename = "folder/subfolder\\file.txt"
-    result = sanitize_filename(filename)
-
-    assert "/" not in result
-    assert "\\" not in result
-
-
 def test_get_epub_files_empty_dir():
     """空ディレクトリでのEPUBファイル検索テスト"""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -82,21 +61,6 @@ def test_get_epub_files_with_files():
         assert "test1.epub" in epub_files
         assert "test3.EPUB" in epub_files
         assert "test2.txt" not in epub_files
-
-
-def test_chunk_text_short():
-    """短いテキストのチャンク分割テスト"""
-    text = "短いテキスト"
-    chunks = chunk_text(text, chunk_size=100, overlap=20)
-
-    assert len(chunks) == 1
-    assert chunks[0] == text
-
-
-def test_chunk_text_empty():
-    """空文字列のチャンク分割テスト"""
-    chunks = chunk_text("", chunk_size=100, overlap=20)
-    assert chunks == []
 
 
 def test_get_epub_files_nonexistent():

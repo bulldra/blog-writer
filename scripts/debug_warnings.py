@@ -2,6 +2,7 @@
 """
 SwigPyの警告を発生させているモジュールを特定するためのデバッグスクリプト
 """
+
 import traceback
 import warnings
 from typing import Any, Optional
@@ -52,7 +53,6 @@ for module_name in modules_to_test:
 
 print("\nアプリケーションのメインモジュールをテスト...")
 try:
-
     print("app.main: インポート完了")
 except Exception as e:
     print(f"app.main: エラー - {e}")

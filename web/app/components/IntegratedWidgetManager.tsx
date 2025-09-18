@@ -1,13 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import WidgetManager from './WidgetManager'
 import PropertiesWidget from './PropertiesWidget'
 import KindleHighlightWidget from './KindleHighlightWidget'
 import PastPostsWidget from './PastPostsWidget'
 import GenerationHistoryWidget from './GenerationHistoryWidget'
 import EpubWidget from './EpubWidget'
+import ScrapeWidget from './ScrapeWidget'
 
 type WidgetType = {
 	id: string
@@ -37,7 +36,7 @@ type IntegratedWidgetManagerProps = {
 	onFieldChange: (key: string, value: string) => void
 	urlCtx: string
 	onChangeUrlCtx: (v: string) => void
-	
+
 	// Kindle widget props
 	obsBooks: Book[]
 	bookFilter: string
@@ -46,38 +45,62 @@ type IntegratedWidgetManagerProps = {
 	obsidianError: string
 	onBookFilterChange: (filter: string) => void
 	onBookSelect: (book: string) => void
-	
+
 	// Past posts widget props
 	savedPosts: SavedPost[]
 	selectedPost: string
 	onPostSelect: (filename: string) => void
-	
+
 	// Generation callbacks
-	onGenerationComplete?: (title: string, content: string, reasoning: string) => void
+	onGenerationComplete?: (
+		title: string,
+		content: string,
+		reasoning: string
+	) => void
+
+	// Scrape widget (optional lift-state)
+	scrapeCfg?: {
+		url: string
+		selector: string
+		mode: 'text' | 'screenshot' | 'both'
+		timeoutMs: number
+		headless: boolean
+		width: number
+		height: number
+	}
+	onChangeScrapeCfg?: (
+		next: Partial<{
+			url: string
+			selector: string
+			mode: 'text' | 'screenshot' | 'both'
+			timeoutMs: number
+			headless: boolean
+			width: number
+			height: number
+		}>
+	) => void
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
-
-export default function IntegratedWidgetManager(props: IntegratedWidgetManagerProps) {
-	const [availableWidgets, setAvailableWidgets] = useState<WidgetType[]>([])
+export default function IntegratedWidgetManager(
+	props: IntegratedWidgetManagerProps
+) {
 	const [selectedWidgets, setSelectedWidgets] = useState<string[]>([])
-	const [showWidgetManager, setShowWidgetManager] = useState(false)
+	const [scrapeCfgLocal, setScrapeCfgLocal] = useState({
+		url: '',
+		selector: '',
+		mode: 'text' as 'text' | 'screenshot' | 'both',
+		timeoutMs: 10000,
+		headless: true,
+		width: 1200,
+		height: 2000,
+	})
 
-	useEffect(() => {
-		// Load available widgets
-		const loadWidgets = async () => {
-			try {
-				const response = await fetch(`${API_BASE}/api/article-templates/widgets/available`)
-				if (response.ok) {
-					const data = await response.json()
-					setAvailableWidgets(data.widgets || [])
-				}
-			} catch (error) {
-				console.error('Failed to load widgets:', error)
-			}
-		}
-		loadWidgets()
-	}, [])
+	// 実際に使う設定は props 優先、なければローカル
+	const scrapeCfg = props.scrapeCfg ?? scrapeCfgLocal
+	const updateScrapeCfg =
+		props.onChangeScrapeCfg ??
+		((next: Partial<typeof scrapeCfgLocal>) =>
+			setScrapeCfgLocal((prev) => ({ ...prev, ...next })))
 
 	useEffect(() => {
 		// Sync selected widgets with template definition
@@ -87,12 +110,6 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 			setSelectedWidgets([])
 		}
 	}, [props.articleTplDef])
-
-	const handleWidgetsChange = (widgets: string[]) => {
-		setSelectedWidgets(widgets)
-		// Here we would typically save the widget configuration to the template
-		// For now, we'll just update the local state
-	}
 
 	const renderWidget = (widgetId: string) => {
 		switch (widgetId) {
@@ -104,7 +121,7 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 						onFieldChange={props.onFieldChange}
 					/>
 				)
-			
+
 			case 'url_context':
 				return (
 					<div className="component-container">
@@ -117,14 +134,15 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 								<input
 									placeholder="https://example.com/...（未指定可）"
 									value={props.urlCtx}
-									onChange={(e) => props.onChangeUrlCtx(e.target.value)}
+									onChange={(e) =>
+										props.onChangeUrlCtx(e.target.value)
+									}
 									className="flex-1 p-2 border rounded text-sm"
 								/>
 								{props.urlCtx && (
 									<button
 										onClick={() => props.onChangeUrlCtx('')}
-										className="px-2 py-1 text-xs bg-gray-500 text-white rounded"
-									>
+										className="px-2 py-1 text-xs bg-gray-500 text-white rounded">
 										クリア
 									</button>
 								)}
@@ -132,7 +150,7 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 						</div>
 					</div>
 				)
-			
+
 			case 'kindle':
 				return (
 					<KindleHighlightWidget
@@ -145,7 +163,7 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 						onBookSelect={props.onBookSelect}
 					/>
 				)
-			
+
 			case 'past_posts':
 				return (
 					<PastPostsWidget
@@ -154,7 +172,7 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 						onPostSelect={props.onPostSelect}
 					/>
 				)
-			
+
 			case 'generation_history':
 				return (
 					<GenerationHistoryWidget
@@ -170,7 +188,7 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 						}}
 					/>
 				)
-			
+
 			case 'epub':
 				return (
 					<EpubWidget
@@ -183,7 +201,21 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 						isEnabled={true}
 					/>
 				)
-			
+
+			case 'scrape':
+				return (
+					<ScrapeWidget
+						url={scrapeCfg.url}
+						selector={scrapeCfg.selector}
+						mode={scrapeCfg.mode}
+						timeoutMs={scrapeCfg.timeoutMs}
+						headless={scrapeCfg.headless}
+						width={scrapeCfg.width}
+						height={scrapeCfg.height}
+						onChange={updateScrapeCfg}
+					/>
+				)
+
 			default:
 				return (
 					<div className="component-container">
@@ -193,96 +225,24 @@ export default function IntegratedWidgetManager(props: IntegratedWidgetManagerPr
 		}
 	}
 
-	const handleOnDragEnd = (result: DropResult) => {
-		if (!result.destination) return
-
-		const items = Array.from(selectedWidgets)
-		const [reorderedItem] = items.splice(result.source.index, 1)
-		items.splice(result.destination.index, 0, reorderedItem)
-
-		handleWidgetsChange(items)
-	}
-
-	if (showWidgetManager) {
-		return (
-			<>
-				<div className="flex justify-between items-center mb-4">
-					<h3 className="text-lg font-medium">ウィジェット設定</h3>
-					<button
-						onClick={() => setShowWidgetManager(false)}
-						className="px-3 py-1 bg-gray-500 text-white rounded text-sm"
-					>
-						設定を閉じる
-					</button>
-				</div>
-				<WidgetManager
-					availableWidgets={availableWidgets}
-					selectedWidgets={selectedWidgets}
-					onWidgetsChange={handleWidgetsChange}
-				/>
-			</>
-		)
-	}
-
 	return (
 		<div>
 			<div className="flex justify-between items-center mb-4">
 				<h3 className="text-lg font-medium">ウィジェット</h3>
-				<button
-					onClick={() => setShowWidgetManager(true)}
-					className="px-3 py-1 bg-blue-500 text-white rounded text-sm"
-				>
-					ウィジェット管理
-				</button>
 			</div>
 
 			{selectedWidgets.length === 0 ? (
 				<div className="component-container">
 					<div className="text-sm text-gray-500">
-						ウィジェットが選択されていません。「ウィジェット管理」ボタンからウィジェットを追加してください。
+						このテンプレートにウィジェットは定義されていません。
 					</div>
 				</div>
 			) : (
-				<DragDropContext onDragEnd={handleOnDragEnd}>
-					<Droppable droppableId="active-widgets">
-						{(provided) => (
-							<div
-								{...provided.droppableProps}
-								ref={provided.innerRef}
-								className="grid gap-4"
-							>
-								{selectedWidgets.map((widgetId, index) => (
-									<Draggable
-										key={widgetId}
-										draggableId={widgetId}
-										index={index}
-									>
-										{(provided, snapshot) => (
-											<div
-												ref={provided.innerRef}
-												{...provided.draggableProps}
-												className={`${
-													snapshot.isDragging ? 'opacity-75' : ''
-												}`}
-											>
-												<div className="relative">
-													<div
-														{...provided.dragHandleProps}
-														className="absolute top-2 right-2 cursor-move text-gray-400 hover:text-gray-600 z-10"
-													>
-														⋮⋮
-													</div>
-													{renderWidget(widgetId)}
-												</div>
-											</div>
-										)}
-									</Draggable>
-								))}
-								{provided.placeholder}
-							</div>
-						)}
-					</Droppable>
-				</DragDropContext>
+				<div className="grid gap-4">
+					{selectedWidgets.map((widgetId) => (
+						<div key={widgetId}>{renderWidget(widgetId)}</div>
+					))}
+				</div>
 			)}
 		</div>
 	)

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.storage import (
     delete_article_template,
+    duplicate_article_template,
     get_article_template,
     get_available_widgets,
     list_article_templates,
@@ -43,6 +44,19 @@ def delete_one(t: str):
     if not ok:
         raise HTTPException(status_code=400, detail="invalid type")
     return {"ok": True}
+
+
+@router.post("/{t}/duplicate")
+def duplicate(t: str, payload: Dict[str, Any]):
+    try:
+        new_type = str(payload.get("new_type", "")).strip() or None
+        new_name = str(payload.get("new_name", "")).strip() or None
+        row = duplicate_article_template(t, new_type=new_type, new_name=new_name)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
+    if not row:
+        raise HTTPException(status_code=404, detail="not found")
+    return row
 
 
 @router.get("/widgets/available")

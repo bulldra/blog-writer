@@ -97,6 +97,25 @@ export default function Page() {
 	const [selectedPost, setSelectedPost] = useState('')
 	const [selectedPostContent, setSelectedPostContent] = useState('')
 
+	// scrape widget 設定（IntegratedWidgetManager より受け取り）
+	const [scrapeCfg, setScrapeCfg] = useState<{
+		url: string
+		selector: string
+		mode: 'text' | 'screenshot' | 'both'
+		timeoutMs: number
+		headless: boolean
+		width: number
+		height: number
+	}>({
+		url: '',
+		selector: '',
+		mode: 'text',
+		timeoutMs: 10000,
+		headless: true,
+		width: 1200,
+		height: 2000,
+	})
+
 	// 初期ロード
 	useEffect(() => {
 		setMounted(true)
@@ -269,6 +288,30 @@ export default function Page() {
 							prompt_template: templateToSend || undefined,
 							article_type: articleTpl || undefined,
 							extra_context: articleTplFields,
+							widgets: (articleTplDef?.widgets || []).includes(
+								'scrape'
+							)
+								? [
+										{
+											type: 'scrape',
+											data: {
+												url:
+													scrapeCfg.url ||
+													urlToSend ||
+													'',
+												selector:
+													scrapeCfg.selector || '',
+												mode: scrapeCfg.mode,
+												timeout_ms: scrapeCfg.timeoutMs,
+												headless: scrapeCfg.headless,
+												viewport: {
+													width: scrapeCfg.width,
+													height: scrapeCfg.height,
+												},
+											},
+										},
+								  ]
+								: [],
 						}),
 					}
 				)
@@ -324,6 +367,24 @@ export default function Page() {
 					prompt_template: templateToSend || undefined,
 					article_type: articleTpl || undefined,
 					extra_context: articleTplFields,
+					widgets: (articleTplDef?.widgets || []).includes('scrape')
+						? [
+								{
+									type: 'scrape',
+									data: {
+										url: scrapeCfg.url || urlToSend || '',
+										selector: scrapeCfg.selector || '',
+										mode: scrapeCfg.mode,
+										timeout_ms: scrapeCfg.timeoutMs,
+										headless: scrapeCfg.headless,
+										viewport: {
+											width: scrapeCfg.width,
+											height: scrapeCfg.height,
+										},
+									},
+								},
+						  ]
+						: [],
 				}),
 				signal: ctl.signal,
 				cache: 'no-store',
@@ -367,13 +428,13 @@ export default function Page() {
 		} finally {
 			setIsStreaming(false)
 			setStreamCtl(null)
-			
+
 			// 生成が完了したら履歴を保存
 			if (draft && draft.trim()) {
 				try {
 					const title = draft.match(/^#\s*(.+)/m)?.[1] || 'Untitled'
 					const widgetsUsed = articleTplDef?.widgets || []
-					
+
 					await fetch(`${API_BASE}/api/generation-history`, {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
@@ -521,6 +582,7 @@ export default function Page() {
 	return (
 		<div style={{ margin: '2rem auto', padding: '0 1rem' }}>
 			<section style={{ display: 'grid', gap: 12 }}>
+				{/* 記事テンプレ選択（最上段） */}
 				<ArticleTemplateSelector
 					articleTpl={articleTpl}
 					articleTplList={articleTplList}
@@ -548,8 +610,12 @@ export default function Page() {
 						} catch {}
 					}}
 					articleTplDef={articleTplDef}
+				/>
+				{/* ウィジェット（プロパティ等）を plan の前に配置 */}
+				<IntegratedWidgetManager
+					articleTplDef={articleTplDef}
 					articleTplFields={articleTplFields}
-					onChangeField={(key, value) =>
+					onFieldChange={(key, value) =>
 						setArticleTplFields((prev) => ({
 							...prev,
 							[key]: value,
@@ -557,6 +623,44 @@ export default function Page() {
 					}
 					urlCtx={urlCtx}
 					onChangeUrlCtx={setUrlCtx}
+					obsBooks={obsBooks}
+					bookFilter={bookFilter}
+					selectedBook={selectedBook}
+					highlights={highlights}
+					obsidianError={obsidianError}
+					onBookFilterChange={setBookFilter}
+					onBookSelect={loadHighlights}
+					savedPosts={savedPosts}
+					selectedPost={selectedPost}
+					onPostSelect={async (filename) => {
+						setSelectedPost(filename)
+						setSelectedPostContent('')
+						if (!filename) return
+						try {
+							const res = await fetch(
+								`${API_BASE}/api/drafts/posts/${encodeURIComponent(
+									filename
+								)}`
+							)
+							if (res.ok) {
+								const json = await res.json()
+								setSelectedPostContent(
+									String(json.content || '')
+								)
+							}
+						} catch {}
+					}}
+					// scrape 設定の受け渡し
+					// @ts-ignore 既存型を崩さないため一時無視（後で型拡張を検討）
+					scrapeCfg={scrapeCfg}
+					// @ts-ignore
+					onChangeScrapeCfg={(next: Partial<typeof scrapeCfg>) =>
+						setScrapeCfg((prev) => ({ ...prev, ...next }))
+					}
+					onGenerationComplete={(title, content, reasoning) => {
+						setDraft(content)
+						setReasoning(reasoning)
+					}}
 				/>
 
 				{/* プランニング（AI が作成・実行で TODO 自動更新） */}
@@ -678,51 +782,6 @@ export default function Page() {
 					onGenerate={generateFromBulletsStream}
 					onGenerateFromTodos={generateFromTodosStream}
 					onStop={stopStreaming}
-				/>
-
-				{/* 統合ウィジェットマネージャー */}
-				<IntegratedWidgetManager
-					articleTplDef={articleTplDef}
-					articleTplFields={articleTplFields}
-					onFieldChange={(key, value) =>
-						setArticleTplFields((prev) => ({
-							...prev,
-							[key]: value,
-						}))
-					}
-					urlCtx={urlCtx}
-					onChangeUrlCtx={setUrlCtx}
-					obsBooks={obsBooks}
-					bookFilter={bookFilter}
-					selectedBook={selectedBook}
-					highlights={highlights}
-					obsidianError={obsidianError}
-					onBookFilterChange={setBookFilter}
-					onBookSelect={loadHighlights}
-					savedPosts={savedPosts}
-					selectedPost={selectedPost}
-					onPostSelect={async (filename) => {
-						setSelectedPost(filename)
-						setSelectedPostContent('')
-						if (!filename) return
-						try {
-							const res = await fetch(
-								`${API_BASE}/api/drafts/posts/${encodeURIComponent(
-									filename
-								)}`
-							)
-							if (res.ok) {
-								const json = await res.json()
-								setSelectedPostContent(
-									String(json.content || '')
-								)
-							}
-						} catch {}
-					}}
-					onGenerationComplete={(title, content, reasoning) => {
-						setDraft(content)
-						setReasoning(reasoning)
-					}}
 				/>
 
 				{/* prompt（折りたたみ） */}

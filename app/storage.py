@@ -429,7 +429,7 @@ WIDGET_TYPES = {
     "properties": {
         "id": "properties",
         "name": "プロパティセット",
-        "description": "",
+        "description": "記事のメタ情報や入力項目をまとめて扱うためのウィジェット",
     },
     "url_context": {
         "id": "url_context",
@@ -451,6 +451,11 @@ WIDGET_TYPES = {
         "name": "EPUB書籍検索",
         "description": "EPUBファイルからベクトル検索でRAG機能を提供し、書籍内容を記事作成の参考にします",
     },
+    "scrape": {
+        "id": "scrape",
+        "name": "スクレイピング",
+        "description": "Selenium + ChromeDriver でページ本文やスクリーンショットを収集します",
+    },
 }
 
 _ALLOWED_WIDGETS = set(WIDGET_TYPES.keys())
@@ -461,6 +466,7 @@ def _default_article_templates() -> Dict[str, Any]:
         "url": {
             "type": "url",
             "name": "URL コンテキスト",
+            "description": "URL の内容をもとに記事化するためのテンプレート",
             "fields": [
                 {"key": "goal", "label": "目的", "input_type": "text"},
                 {"key": "audience", "label": "読者", "input_type": "text"},
@@ -473,6 +479,7 @@ def _default_article_templates() -> Dict[str, Any]:
         "note": {
             "type": "note",
             "name": "雑記",
+            "description": "自由記述向けのテンプレート",
             "fields": [
                 {"key": "theme", "label": "テーマ", "input_type": "text"},
                 {"key": "goal", "label": "目的", "input_type": "text"},
@@ -485,6 +492,7 @@ def _default_article_templates() -> Dict[str, Any]:
         "review": {
             "type": "review",
             "name": "書評",
+            "description": "書籍の所感やおすすめポイントをまとめるテンプレート",
             "fields": [
                 {"key": "book_title", "label": "書籍タイトル", "input_type": "text"},
                 {"key": "book_author", "label": "著者", "input_type": "text"},
@@ -534,6 +542,8 @@ def list_article_templates() -> List[Dict[str, Any]]:
                 # type はキーに整合
                 r = dict(row)
                 r["type"] = k
+                # description を常に文字列で付与
+                r["description"] = str(r.get("description", ""))
                 # widgets 正規化
                 ws = r.get("widgets", [])
                 if isinstance(ws, list):
@@ -554,6 +564,7 @@ def get_article_template(t: str) -> Optional[Dict[str, Any]]:
             return None
         r = dict(row)
         r["type"] = t
+        r["description"] = str(r.get("description", ""))
         ws = r.get("widgets", [])
         if isinstance(ws, list):
             r["widgets"] = [str(w) for w in ws if str(w) in _ALLOWED_WIDGETS]
@@ -586,10 +597,32 @@ def save_article_template(t: str, payload: Dict[str, Any]) -> Optional[Dict[str,
         if key in seen_keys:
             raise ValueError(f"duplicate field key: {key}")
         seen_keys.add(key)
-        if itype not in {"text", "textarea"}:
+        # 新しい入力タイプ date/select をサポート
+        allowed_types = {"text", "textarea", "date", "select"}
+        if itype not in allowed_types:
             itype = "text"
-        norm_fields.append({"key": key, "label": label, "input_type": itype})
+        field_row: Dict[str, Any] = {
+            "key": key,
+            "label": label,
+            "input_type": itype,
+        }
+        if itype == "select":
+            raw_opts = f.get("options", [])
+            opts: List[str] = []
+            if isinstance(raw_opts, list):
+                for o in raw_opts[:50]:
+                    if isinstance(o, str):
+                        s = o.strip()
+                        if s and s not in opts:
+                            opts.append(s)
+            if not opts:
+                # options が無効なら text にフォールバック
+                field_row["input_type"] = "text"
+            else:
+                field_row["options"] = opts
+        norm_fields.append(field_row)
     prompt_template = str(payload.get("prompt_template", ""))
+    description = str(payload.get("description", ""))
     widgets_raw = payload.get("widgets", [])
     widgets: List[str] = []
     if isinstance(widgets_raw, list):
@@ -609,6 +642,7 @@ def save_article_template(t: str, payload: Dict[str, Any]) -> Optional[Dict[str,
         row = {
             "type": t,
             "name": name,
+            "description": description,
             "fields": norm_fields,
             "prompt_template": prompt_template,
             "widgets": widgets,
@@ -635,6 +669,65 @@ def delete_article_template(t: str) -> bool:
         data["article_templates"] = items
         _atomic_write(SETTINGS_FILE, data)
         return True
+
+
+def duplicate_article_template(
+    src_type: str, new_type: Optional[str] = None, new_name: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """記事テンプレートを複製する。
+
+    - src_type: 複製元のテンプレート type
+    - new_type: 新しいテンプレートの type（省略時は自動採番: "{src}-copy", "{src}-copy-2" ...）
+    - new_name: 新しいテンプレートの表示名（省略時は "{旧name} コピー"）
+
+    Returns: 生成されたテンプレート（保存後）/ 無ければ None
+    """
+    src = get_article_template(src_type)
+    if not src:
+        return None
+
+    # 既存一覧を取得して新IDの重複を回避
+    with _lock:
+        data = _read_json(
+            SETTINGS_FILE,
+            {"provider": "gemini", "model": "gemini-2.5-flash", "api_key": ""},
+        )
+        items = data.get("article_templates")
+        if not isinstance(items, dict):
+            items = {}
+
+    def _sanitize(t: str) -> str:
+        t2 = t.strip().lower()
+        t2 = re.sub(r"[^a-z0-9_\-]", "", t2)
+        t2 = re.sub(r"\-+", "-", t2)
+        return t2 or "copy"
+
+    # new_type の決定
+    if new_type:
+        nid = _sanitize(new_type)
+        # 明示指定で重複している場合は衝突を知らせるために例外
+        if nid in items:
+            raise ValueError("template type already exists")
+    else:
+        base = _sanitize(f"{src_type}-copy")
+        nid = base
+        i = 2
+        while nid in items:
+            nid = f"{base}-{i}"
+            i += 1
+
+    # 表示名
+    name = (new_name or f"{src.get('name', src_type)} コピー").strip()
+
+    payload: Dict[str, Any] = {
+        "name": name or nid,
+        "description": str(src.get("description", "")),
+        "fields": list(src.get("fields", [])),
+        "prompt_template": str(src.get("prompt_template", "")),
+        "widgets": list(src.get("widgets", [])),
+    }
+
+    return save_article_template(nid, payload)
 
 
 def get_available_widgets() -> List[Dict[str, str]]:

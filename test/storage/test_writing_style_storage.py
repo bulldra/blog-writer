@@ -1,14 +1,8 @@
 """文体テンプレートストレージのテスト"""
 
-import tempfile
-from pathlib import Path
-
-import pytest
-
 from app.storage import (
     delete_writing_style,
     get_writing_style,
-    init_storage,
     list_writing_styles,
     save_writing_style,
 )

@@ -60,7 +60,7 @@ def _build_svg(title: str, width: int, height: int, theme: Optional[str]) -> str
   </defs>
   <rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"url(#g)\"/>
   <g>
-    {''.join(text_elems)}
+    {"".join(text_elems)}
   </g>
   <rect x=\"0\" y=\"0\" width=\"100%\" height=\"100%\" fill=\"none\" stroke=\"rgba(255,255,255,0.2)\"/>
   <text x=\"96\" y=\"{height - 48}\" fill=\"rgba(255,255,255,0.7)\" font-size=\"22\" font-family=\"ui-sans-serif, system-ui\">blog-writer</text>

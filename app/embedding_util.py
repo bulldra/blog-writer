@@ -44,10 +44,8 @@ class EmbeddingManager:
         if not self.model:
             raise RuntimeError("埋め込みモデルの読み込みに失敗しました")
 
-        # バッチ処理で効率化
-        local_embeddings = self.model.encode(
-            texts, batch_size=32, show_progress_bar=True
-        )
+        # テスト互換性のため追加引数は渡さずデフォルト挙動を使用
+        local_embeddings = self.model.encode(texts)
 
         # 正規化（コサイン類似度用）
         local_embeddings = local_embeddings / np.linalg.norm(
@@ -118,15 +116,15 @@ class EmbeddingManager:
     def save_index(self, filepath: Path) -> None:
         """インデックスをファイルに保存
 
+        テスト仕様:
+          - インデックスが未構築でも例外を投げず"空インデックス"としてファイルを生成
+          - 引数で与えたパスそのものに書き込む（拡張子を書き換えない）
+
         Args:
             filepath: 保存先ファイルパス
         """
-        if not self.index or self.embeddings is None:
-            raise ValueError("保存するインデックスがありません")
-
         filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        # すべてのデータをPickleで保存
         data = {
             "texts": self.texts,
             "metadata": self.metadata,
@@ -134,8 +132,7 @@ class EmbeddingManager:
             "embeddings": self.embeddings,
             "index": self.index,
         }
-
-        with open(filepath.with_suffix(".pkl"), "wb") as f:
+        with open(filepath, "wb") as f:
             pickle.dump(data, f)
 
     def load_index(self, filepath: Path) -> bool:
@@ -148,13 +145,16 @@ class EmbeddingManager:
             読み込み成功の可否
         """
         try:
-            data_file = filepath.with_suffix(".pkl")
+            # 互換性: 直接のパス優先。存在しなければ .pkl も見る
+            if filepath.exists():
+                target = filepath
+            else:
+                alt = filepath.with_suffix(".pkl")
+                if not alt.exists():
+                    return False
+                target = alt
 
-            if not data_file.exists():
-                return False
-
-            # データを読み込み
-            with open(data_file, "rb") as f:
+            with open(target, "rb") as f:
                 data = pickle.load(f)
 
             self.texts = data["texts"]

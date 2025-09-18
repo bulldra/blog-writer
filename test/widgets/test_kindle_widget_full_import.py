@@ -30,7 +30,6 @@ def test_kindle_widget_imports_all_highlights_for_selected_book():
         patch("app.routers.obsidian.find_obsidian_dir") as mock_find_dir,
         patch("app.routers.obsidian.collect_highlights") as mock_collect,
     ):
-
         mock_find_dir.return_value = "/mock/path"
         mock_collect.return_value = mock_highlights
 
@@ -91,7 +90,6 @@ def test_kindle_widget_filters_by_book_correctly():
         patch("app.routers.obsidian.find_obsidian_dir") as mock_find_dir,
         patch("app.routers.obsidian.collect_highlights") as mock_collect,
     ):
-
         mock_find_dir.return_value = "/mock/path"
         mock_collect.return_value = mock_highlights
 
@@ -146,7 +144,6 @@ def test_kindle_widget_handles_empty_book_filter():
         patch("app.routers.obsidian.find_obsidian_dir") as mock_find_dir,
         patch("app.routers.obsidian.collect_highlights") as mock_collect,
     ):
-
         mock_find_dir.return_value = "/mock/path"
         mock_collect.return_value = mock_highlights
 

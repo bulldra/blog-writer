@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from test.helpers.common import create_test_client
+from ..helpers.common import create_test_client
 
 
 def test_ai_generate_basic():

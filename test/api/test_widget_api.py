@@ -16,7 +16,7 @@ def test_get_available_widgets_api():
     widgets = data["widgets"]
 
     assert isinstance(widgets, list)
-    assert len(widgets) == 6
+    assert len(widgets) == 7
 
     widget_ids = [w["id"] for w in widgets]
     assert set(widget_ids) == {
@@ -26,6 +26,7 @@ def test_get_available_widgets_api():
         "past_posts",
         "epub",
         "notion",
+        "scrape",
     }
 
     for widget in widgets:

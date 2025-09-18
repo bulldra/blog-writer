@@ -20,8 +20,10 @@ dependencies = [
 	"sentence-transformers>=5.1.0",
 	"beautifulsoup4>=4.12.0",
 	"fastmcp>=2.12.3",
-    "SQLAlchemy>=2.0.0",
+	"SQLAlchemy>=2.0.0",
+	"pytest-cov>=7.0.0",
 ]
+
 
 [tool.uv]
 # uvでインストール時に発生しがちなビルド分離問題の回避など、必要な場合にここにオプションを置けます

@@ -2,6 +2,7 @@
 """
 SwigPy警告を発生させているライブラリを詳細にトレースするスクリプト
 """
+
 import sys
 import traceback
 import warnings

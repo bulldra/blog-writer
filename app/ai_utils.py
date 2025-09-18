@@ -3,7 +3,7 @@ from __future__ import annotations
 import html as html_mod
 import logging
 import re
-from typing import List, Mapping, Optional, Protocol
+from typing import AsyncGenerator, List, Mapping, Optional, Protocol
 
 _logger = logging.getLogger(__name__)
 
@@ -172,6 +172,12 @@ async def call_ai(
         return str(resp.get("text", ""))
     except Exception:
         return ""
+
+
+async def call_ai_stream(prompt: str) -> AsyncGenerator[str, None]:  # pragma: no cover
+    """簡易ストリーム版。テストでパッチされる前提の最小実装。"""
+    text = await call_ai(prompt)
+    yield text
 
 
 async def analyze_writing_style(text: str) -> Optional[dict]:

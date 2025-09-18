@@ -1,5 +1,4 @@
-from test.helpers.api import validate_template_response
-from test.helpers.common import create_test_client
+from ..helpers.common import create_test_client
 
 
 def test_api_save_article_template_duplicate_key_returns_400():

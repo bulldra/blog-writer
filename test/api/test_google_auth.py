@@ -4,9 +4,7 @@ import os
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi.testclient import TestClient
 
-from app.main import create_app
 from app.routers.auth import create_jwt_token, verify_jwt_token
 
 

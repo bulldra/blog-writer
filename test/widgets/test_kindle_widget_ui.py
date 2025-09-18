@@ -17,7 +17,6 @@ def test_kindle_widget_ui_messaging():
         patch("app.routers.obsidian.find_obsidian_dir") as mock_find_dir,
         patch("app.routers.obsidian.collect_highlights") as mock_collect,
     ):
-
         mock_find_dir.return_value = "/mock/path"
         mock_highlights = [
             Mock(
@@ -78,7 +77,6 @@ def test_kindle_widget_highlight_count_accuracy():
         patch("app.routers.obsidian.find_obsidian_dir") as mock_find_dir,
         patch("app.routers.obsidian.collect_highlights") as mock_collect,
     ):
-
         mock_find_dir.return_value = "/mock/path"
         mock_collect.return_value = mock_highlights
 
