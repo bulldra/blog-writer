@@ -37,7 +37,9 @@ export default function TemplateDetailPage({
 	const [availableWidgets, setAvailableWidgets] = useState<Widget[]>([])
 	const [saving, setSaving] = useState(false)
 	const [proposing, setProposing] = useState(false)
+	const [executing, setExecuting] = useState(false)
 	const [error, setError] = useState('')
+	const [executeResult, setExecuteResult] = useState('')
 
 	const [name, setName] = useState('')
 	const [fields, setFields] = useState<Field[]>([])
@@ -227,28 +229,75 @@ export default function TemplateDetailPage({
 		}
 	}
 
-	const updateField = (idx: number, key: keyof Field, val: string) => {
-		setFields((prev) => {
-			const next = [...prev]
-			next[idx] = { ...next[idx], [key]: val }
-			return next
-		})
-		setError('')
-	}
-	const addField = () => {
-		if (fields.length >= 30) {
-			setError('項目は最大 30 個までです')
+	const executeTemplate = async () => {
+		if (!promptText.trim()) {
+			setError('実行するプロンプトテンプレートがありません')
 			return
 		}
-		setFields((prev) => [
-			...prev,
-			{ key: '', label: '', input_type: 'text' },
-		])
+		try {
+			setExecuting(true)
+			setError('')
+			setExecuteResult('')
+			
+			// デモ用のサンプルデータ
+			const sampleTitle = '新しい記事のタイトル'
+			const sampleBullets = [
+				'ポイント1: 重要な内容について説明',
+				'ポイント2: 具体例を挙げて解説',
+				'ポイント3: まとめと今後の展望'
+			]
+			
+			// プロンプトテンプレートを実行
+			const res = await fetch(`${API_BASE}/api/ai/from-bullets`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					bullets: sampleBullets,
+					title: sampleTitle,
+					style: '丁寧で分かりやすい文体',
+					length: '中程度（1000-1500文字）',
+					prompt_template: promptText,
+					url_context: widgets.includes('url_context') ? 'https://example.com' : undefined,
+					highlights: widgets.includes('kindle') ? ['サンプルハイライト'] : undefined,
+					extra_context: {},
+				}),
+			})
+			
+			if (res.ok) {
+				const json = await res.json()
+				setExecuteResult(String(json.text || ''))
+			} else {
+				setError('テンプレートの実行に失敗しました')
+			}
+		} catch (err) {
+			setError('テンプレートの実行中にエラーが発生しました')
+		} finally {
+			setExecuting(false)
+		}
 	}
-	const removeField = (idx: number) => {
-		setFields((prev) => prev.filter((_, i) => i !== idx))
-		setError('')
-	}
+
+	// const updateField = (idx: number, key: keyof Field, val: string) => {
+	// 	setFields((prev) => {
+	// 		const next = [...prev]
+	// 		next[idx] = { ...next[idx], [key]: val }
+	// 		return next
+	// 	})
+	// 	setError('')
+	// }
+	// const addField = () => {
+	// 	if (fields.length >= 30) {
+	// 		setError('項目は最大 30 個までです')
+	// 		return
+	// 	}
+	// 	setFields((prev) => [
+	// 		...prev,
+	// 		{ key: '', label: '', input_type: 'text' },
+	// 	])
+	// }
+	// const removeField = (idx: number) => {
+	// 	setFields((prev) => prev.filter((_, i) => i !== idx))
+	// 	setError('')
+	// }
 
 	const varsForWidget = (widgetId: string): string[] => {
 		if (widgetId === 'properties')
@@ -645,6 +694,20 @@ export default function TemplateDetailPage({
 						<button onClick={aiPropose} disabled={proposing}>
 							{proposing ? '提案中…' : 'ウィジェットに基づき提案'}
 						</button>
+						<button 
+							onClick={executeTemplate} 
+							disabled={executing || !promptText.trim()}
+							style={{
+								backgroundColor: executing ? '#ccc' : '#4CAF50',
+								color: 'white',
+								border: 'none',
+								padding: '8px 16px',
+								borderRadius: '4px',
+								cursor: executing || !promptText.trim() ? 'not-allowed' : 'pointer'
+							}}
+						>
+							{executing ? 'テンプレート実行中…' : 'テンプレートを実行'}
+						</button>
 					</div>
 					<textarea
 						ref={promptRef}
@@ -717,12 +780,35 @@ export default function TemplateDetailPage({
 					)}
 				</div>
 
+				{/* テンプレート実行結果 */}
+				{executeResult && (
+					<div style={{ marginTop: 20 }}>
+						<strong>テンプレート実行結果</strong>
+						<div 
+							style={{
+								marginTop: 8,
+								padding: 12,
+								border: '1px solid #ddd',
+								borderRadius: 4,
+								backgroundColor: '#f9f9f9',
+								whiteSpace: 'pre-wrap',
+								fontSize: 14,
+								maxHeight: 400,
+								overflow: 'auto'
+							}}
+						>
+							{executeResult}
+						</div>
+					</div>
+				)}
+
 				<div
 					style={{
 						display: 'flex',
 						gap: 8,
 						alignItems: 'center',
 						flexWrap: 'wrap',
+						marginTop: 20,
 					}}>
 					<button onClick={save} disabled={saving}>
 						{saving ? '保存中…' : '保存'}
