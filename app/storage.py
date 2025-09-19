@@ -456,6 +456,11 @@ WIDGET_TYPES = {
         "name": "スクレイピング",
         "description": "Selenium + ChromeDriver でページ本文やスクリーンショットを収集します",
     },
+    "mcp": {
+        "id": "mcp",
+        "name": "MCP クライアント",
+        "description": "Model Context Protocol (MCP) サーバーから情報を取得し、記事作成の参考にします",
+    },
 }
 
 _ALLOWED_WIDGETS = set(WIDGET_TYPES.keys())
@@ -888,6 +893,89 @@ def save_notion_settings(
 
         data["notion"] = notion_config
         _atomic_write(SETTINGS_FILE, data)
+
+
+def get_mcp_settings() -> Dict[str, Any]:
+    """MCP設定を取得する"""
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        mcp_config = data.get("mcp", {})
+        return {
+            "servers": dict(mcp_config.get("servers", {})),
+            "enabled": bool(mcp_config.get("enabled", False)),
+        }
+
+
+def save_mcp_settings(servers: Dict[str, Any], enabled: bool = False) -> None:
+    """MCP設定を保存する"""
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        
+        mcp_config = {
+            "servers": dict(servers),
+            "enabled": bool(enabled),
+        }
+        
+        data["mcp"] = mcp_config
+        _atomic_write(SETTINGS_FILE, data)
+
+
+def add_mcp_server(
+    server_id: str,
+    name: str,
+    command: str,
+    args: Optional[List[str]] = None,
+    env: Optional[Dict[str, str]] = None,
+    enabled: bool = False,
+) -> None:
+    """MCP サーバーを追加する"""
+    if args is None:
+        args = []
+    if env is None:
+        env = {}
+    
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        mcp_config = data.get("mcp", {})
+        servers = dict(mcp_config.get("servers", {}))
+        
+        servers[server_id] = {
+            "name": str(name),
+            "command": str(command),
+            "args": list(args),
+            "env": dict(env),
+            "enabled": bool(enabled),
+        }
+        
+        mcp_config = {
+            "servers": servers,
+            "enabled": bool(mcp_config.get("enabled", False)),
+        }
+        
+        data["mcp"] = mcp_config
+        _atomic_write(SETTINGS_FILE, data)
+
+
+def remove_mcp_server(server_id: str) -> bool:
+    """MCP サーバーを削除する"""
+    with _lock:
+        data = _read_json(SETTINGS_FILE, {})
+        mcp_config = data.get("mcp", {})
+        servers = dict(mcp_config.get("servers", {}))
+        
+        if server_id not in servers:
+            return False
+        
+        del servers[server_id]
+        
+        mcp_config = {
+            "servers": servers,
+            "enabled": bool(mcp_config.get("enabled", False)),
+        }
+        
+        data["mcp"] = mcp_config
+        _atomic_write(SETTINGS_FILE, data)
+        return True
 
 
 def get_epub_settings() -> Dict[str, Any]:

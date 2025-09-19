@@ -12,6 +12,7 @@ from app.routers import article_templates as article_templates_router
 from app.routers import epub as epub_router
 from app.routers import generation_history as generation_history_router
 from app.routers import images as images_router
+from app.routers import mcp as mcp_router
 from app.routers import migrations as migrations_router
 from app.routers import notion as notion_router
 from app.routers import obsidian as obsidian_router
@@ -108,6 +109,11 @@ def create_app() -> FastAPI:
         notion_router.router,
         prefix="/api/notion",
         tags=["notion"],
+    )
+    app.include_router(
+        mcp_router.router,
+        prefix="/api/mcp",
+        tags=["mcp"],
     )
     app.include_router(
         writing_styles_router.router,
