@@ -427,12 +427,10 @@ class WidgetSuggestionsRequest(BaseModel):
 async def widget_suggestions(payload: WidgetSuggestionsRequest):
     try:
         if call_ai is not _call_ai_internal:  # パッチされている場合
-            prompt = (
-                "次のウィジェットとページ文脈を踏まえて追加提案を50文字以内で日本語で返してください。"
-                "\nウィジェット一覧: "
-                + ", ".join(payload.widgets)
-                + "\n文脈: "
-                + json.dumps(payload.context, ensure_ascii=False)
+            prompt = "次のウィジェットとページ文脈を踏まえて追加提案を50文字以内で日本語で返してください。" "\nウィジェット一覧: " + ", ".join(
+                payload.widgets
+            ) + "\n文脈: " + json.dumps(
+                payload.context, ensure_ascii=False
             )
             text = await call_ai(prompt)
             return {"text": text}
@@ -455,12 +453,10 @@ async def widget_suggestions_stream(payload: WidgetSuggestionsRequest):
     async def gen() -> AsyncGenerator[bytes, None]:
         import inspect
 
-        prompt = (
-            "次のウィジェットとページ文脈を踏まえて追加提案を簡潔に日本語で段階的に出力してください。"
-            "\nウィジェット一覧: "
-            + ", ".join(payload.widgets)
-            + "\n文脈: "
-            + json.dumps(payload.context, ensure_ascii=False)
+        prompt = "次のウィジェットとページ文脈を踏まえて追加提案を簡潔に日本語で段階的に出力してください。" "\nウィジェット一覧: " + ", ".join(
+            payload.widgets
+        ) + "\n文脈: " + json.dumps(
+            payload.context, ensure_ascii=False
         )
 
         # パッチされていない（ラッパそのまま）場合は重い処理を避けスタブ
