@@ -8,12 +8,6 @@ import GenerationHistoryWidget from './GenerationHistoryWidget'
 import EpubWidget from './EpubWidget'
 import ScrapeWidget from './ScrapeWidget'
 
-type WidgetType = {
-	id: string
-	name: string
-	description: string
-}
-
 type TemplateField = {
 	key: string
 	label: string
@@ -34,6 +28,8 @@ type IntegratedWidgetManagerProps = {
 	articleTplDef: TemplateDef
 	articleTplFields: Record<string, string>
 	onFieldChange: (key: string, value: string) => void
+	onFieldsChange?: (fields: TemplateField[]) => void
+	editableProperties?: boolean
 	urlCtx: string
 	onChangeUrlCtx: (v: string) => void
 
@@ -119,6 +115,8 @@ export default function IntegratedWidgetManager(
 						fields={props.articleTplDef?.fields || []}
 						values={props.articleTplFields}
 						onFieldChange={props.onFieldChange}
+						onFieldsChange={props.onFieldsChange}
+						editable={props.editableProperties}
 					/>
 				)
 
