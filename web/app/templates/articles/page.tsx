@@ -6,6 +6,7 @@ import {
 	Draggable,
 	type DropResult,
 } from '@hello-pangea/dnd'
+import IntegratedWidgetManager from '../../components/IntegratedWidgetManager'
 
 type Field = { key: string; label: string; input_type: 'text' | 'textarea' }
 type Widget = { id: string; name: string; description: string }
@@ -31,6 +32,8 @@ export default function ArticleTemplatesPage() {
 	const [loading, setLoading] = useState(false)
 	const [savedMsg, setSavedMsg] = useState<string>('')
 	const [errorMsg, setErrorMsg] = useState<string>('')
+	const [executing, setExecuting] = useState(false)
+	const [executeResult, setExecuteResult] = useState('')
 
 	// @補完用の状態
 	const promptRef = useRef<HTMLTextAreaElement | null>(null)
@@ -360,6 +363,53 @@ export default function ArticleTemplatesPage() {
 		}
 	}
 
+	const executeTemplate = async () => {
+		if (!tpl || !tpl.prompt_template?.trim()) {
+			setErrorMsg('実行するプロンプトテンプレートがありません')
+			return
+		}
+		try {
+			setExecuting(true)
+			setErrorMsg('')
+			setExecuteResult('')
+			
+			// デモ用のサンプルデータ
+			const sampleTitle = '新しい記事のタイトル'
+			const sampleBullets = [
+				'ポイント1: 重要な内容について説明',
+				'ポイント2: 具体例を挙げて解説',
+				'ポイント3: まとめと今後の展望'
+			]
+			
+			// プロンプトテンプレートを実行
+			const res = await fetch(`${API_BASE}/api/ai/from-bullets`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					bullets: sampleBullets,
+					title: sampleTitle,
+					style: '丁寧で分かりやすい文体',
+					length: '中程度（1000-1500文字）',
+					prompt_template: tpl.prompt_template,
+					url_context: tpl.widgets?.includes('url_context') ? 'https://example.com' : undefined,
+					highlights: tpl.widgets?.includes('kindle') ? ['サンプルハイライト'] : undefined,
+					extra_context: {},
+				}),
+			})
+			
+			if (res.ok) {
+				const json = await res.json()
+				setExecuteResult(String(json.text || ''))
+			} else {
+				setErrorMsg('テンプレートの実行に失敗しました')
+			}
+		} catch (err) {
+			setErrorMsg('テンプレートの実行中にエラーが発生しました')
+		} finally {
+			setExecuting(false)
+		}
+	}
+
 	const preview = useMemo(() => {
 		if (!tpl) return ''
 		const lines: string[] = []
@@ -426,7 +476,40 @@ export default function ArticleTemplatesPage() {
 							初期状態へ戻す
 						</button>
 						{savedMsg && <span>{savedMsg}</span>}
+						{errorMsg && (
+							<span style={{ color: '#a00', fontSize: 12 }}>
+								{errorMsg}
+							</span>
+						)}
 					</div>
+
+					{/* プロパティセット専用編集セクション */}
+					{tpl.widgets.includes('properties') && (
+						<div>
+							<strong>プロパティセット設定</strong>
+							<div style={{ marginTop: 8, padding: 12, border: '1px solid #ddd', borderRadius: 4 }}>
+								<IntegratedWidgetManager
+									articleTplDef={tpl}
+									articleTplFields={{}}
+									onFieldChange={() => {}}
+									onFieldsChange={(fields) => setTpl({ ...tpl, fields })}
+									editableProperties={true}
+									urlCtx=""
+									onChangeUrlCtx={() => {}}
+									obsBooks={[]}
+									bookFilter=""
+									selectedBook=""
+									highlights={[]}
+									obsidianError=""
+									onBookFilterChange={() => {}}
+									onBookSelect={() => {}}
+									savedPosts={[]}
+									selectedPost=""
+									onPostSelect={() => {}}
+								/>
+							</div>
+						</div>
+					)}
 
 					{/* 入力項目セクションはプロパティセットウィジェットへ統合のため削除 */}
 
@@ -741,6 +824,20 @@ export default function ArticleTemplatesPage() {
 							<button onClick={aiPropose}>
 								ウィジェットに基づき提案
 							</button>
+							<button 
+								onClick={executeTemplate} 
+								disabled={executing || !tpl?.prompt_template?.trim()}
+								style={{
+									backgroundColor: executing || !tpl?.prompt_template?.trim() ? '#ccc' : '#4CAF50',
+									color: 'white',
+									border: 'none',
+									padding: '8px 16px',
+									borderRadius: '4px',
+									cursor: executing || !tpl?.prompt_template?.trim() ? 'not-allowed' : 'pointer'
+								}}
+							>
+								{executing ? 'テンプレート実行中…' : 'テンプレートを実行'}
+							</button>
 						</div>
 						<textarea
 							ref={promptRef}
@@ -814,6 +911,29 @@ export default function ArticleTemplatesPage() {
 							</div>
 						)}
 					</div>
+
+					{/* テンプレート実行結果 */}
+					{executeResult && (
+						<div style={{ marginTop: 20 }}>
+							<strong>テンプレート実行結果</strong>
+							<div 
+								style={{
+									marginTop: 8,
+									padding: 12,
+									border: '1px solid #ddd',
+									borderRadius: 4,
+									backgroundColor: '#f9f9f9',
+									whiteSpace: 'pre-wrap',
+									fontSize: 14,
+									maxHeight: 400,
+									overflow: 'auto'
+								}}
+							>
+								{executeResult}
+							</div>
+						</div>
+					)}
+
 					<div>
 						<strong>プレビュー</strong>
 						<pre
