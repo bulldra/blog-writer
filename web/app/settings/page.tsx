@@ -21,6 +21,11 @@ export default function SettingsPage() {
 	const [healthError, setHealthError] = useState('')
 	const [obsidianSaving, setObsidianSaving] = useState(false)
 
+	// EPUB 設定用のstate
+	const [epubDir, setEpubDir] = useState('')
+	const [epubDirInput, setEpubDirInput] = useState('')
+	const [epubSaving, setEpubSaving] = useState(false)
+
 	useEffect(() => {
 		// AI設定の取得
 		;(async () => {
@@ -62,6 +67,20 @@ export default function SettingsPage() {
 					const j = await r.json()
 					setObsidianDir(j?.rootDir || '')
 					setObsidianDirInput(j?.rootDir || '')
+				}
+			} catch {
+				/* noop */
+			}
+		})()
+
+		// EPUB設定の取得
+		;(async () => {
+			try {
+				const r = await fetch(`${API_BASE}/api/epub/settings`)
+				if (r.ok) {
+					const j = await r.json()
+					setEpubDir(j?.epub_directory || '')
+					setEpubDirInput(j?.epub_directory || '')
 				}
 			} catch {
 				/* noop */
@@ -118,6 +137,36 @@ export default function SettingsPage() {
 			alert('設定に失敗しました（ネットワーク）')
 		} finally {
 			setObsidianSaving(false)
+		}
+	}
+
+	const saveEpub = async (path: string | null) => {
+		setEpubSaving(true)
+		try {
+			const config = {
+				epub_directory: path || '',
+				embedding_model: 'sentence-transformers/all-MiniLM-L6-v2',
+				chunk_size: 500,
+				overlap_size: 50,
+				search_top_k: 5,
+				min_similarity_score: 0.1
+			}
+			const r = await fetch(`${API_BASE}/api/epub/settings`, { 
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(config)
+			})
+			if (r.ok) {
+				setEpubDir(path || '')
+				if (!path) setEpubDirInput('')
+				alert('EPUB設定を保存しました')
+			} else {
+				alert('設定に失敗しました')
+			}
+		} catch {
+			alert('設定に失敗しました（ネットワーク）')
+		} finally {
+			setEpubSaving(false)
 		}
 	}
 
@@ -254,6 +303,47 @@ export default function SettingsPage() {
 					) : (
 						<span>検出ディレクトリ: {healthDir || '(未検出)'}</span>
 					)}
+				</div>
+			</section>
+
+			<hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+			
+			<h2>EPUB設定</h2>
+			<p>EPUBファイルが格納されているディレクトリを設定することで、書籍検索機能を利用できます。</p>
+			
+			<section
+				style={{
+					margin: '16px 0',
+					padding: 16,
+					border: '1px solid var(--border-color)',
+					borderRadius: '8px',
+					backgroundColor: 'var(--background-secondary)',
+				}}>
+				<label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+					EPUB ディレクトリ
+				</label>
+				<div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+					<input
+						placeholder="/absolute/path/to/epub/files"
+						value={epubDirInput}
+						onChange={(e) => setEpubDirInput(e.target.value)}
+						style={{ flex: 1, padding: 8 }}
+					/>
+					<button
+						onClick={() => saveEpub(epubDirInput.trim() || '')}
+						disabled={epubSaving}
+						style={{ padding: '8px 16px' }}>
+						保存
+					</button>
+					<button
+						onClick={() => saveEpub(null)}
+						disabled={epubSaving}
+						style={{ padding: '8px 16px' }}>
+						クリア
+					</button>
+				</div>
+				<div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>
+					現在の設定: {epubDir || '(未設定)'}
 				</div>
 			</section>
 
