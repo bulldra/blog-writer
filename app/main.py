@@ -15,6 +15,7 @@ from app.routers import images as images_router
 from app.routers import migrations as migrations_router
 from app.routers import notion as notion_router
 from app.routers import obsidian as obsidian_router
+from app.routers import tasks as tasks_router
 from app.routers import templates as templates_router
 from app.routers import writing_styles as writing_styles_router
 from app.storage import init_storage
@@ -114,6 +115,7 @@ def create_app() -> FastAPI:
         prefix="/api/writing-styles",
         tags=["writing-styles"],
     )
+    app.include_router(tasks_router.router, tags=["tasks"])
 
     @app.get("/api/health")
     def health() -> Dict[str, str]:
