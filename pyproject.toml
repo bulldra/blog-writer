@@ -24,6 +24,9 @@ dependencies = [
 	"pytest-cov>=7.0.0",
 ]
 
+[tool.setuptools]
+packages = ["app"]
+
 
 [tool.uv]
 # uvでインストール時に発生しがちなビルド分離問題の回避など、必要な場合にここにオプションを置けます
