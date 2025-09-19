@@ -7,6 +7,7 @@ import PastPostsWidget from './PastPostsWidget'
 import GenerationHistoryWidget from './GenerationHistoryWidget'
 import EpubWidget from './EpubWidget'
 import ScrapeWidget from './ScrapeWidget'
+import MCPWidget from './MCPWidget'
 
 type TemplateField = {
 	key: string
@@ -75,6 +76,20 @@ type IntegratedWidgetManagerProps = {
 			height: number
 		}>
 	) => void
+
+	// MCP widget (optional lift-state)
+	mcpCfg?: {
+		serverId: string
+		toolName: string
+		arguments: Record<string, unknown>
+	}
+	onChangeMcpCfg?: (
+		next: Partial<{
+			serverId: string
+			toolName: string
+			arguments: Record<string, unknown>
+		}>
+	) => void
 }
 
 export default function IntegratedWidgetManager(
@@ -90,6 +105,11 @@ export default function IntegratedWidgetManager(
 		width: 1200,
 		height: 2000,
 	})
+	const [mcpCfgLocal, setMcpCfgLocal] = useState({
+		serverId: '',
+		toolName: '',
+		arguments: {},
+	})
 
 	// 実際に使う設定は props 優先、なければローカル
 	const scrapeCfg = props.scrapeCfg ?? scrapeCfgLocal
@@ -97,6 +117,12 @@ export default function IntegratedWidgetManager(
 		props.onChangeScrapeCfg ??
 		((next: Partial<typeof scrapeCfgLocal>) =>
 			setScrapeCfgLocal((prev) => ({ ...prev, ...next })))
+
+	const mcpCfg = props.mcpCfg ?? mcpCfgLocal
+	const updateMcpCfg =
+		props.onChangeMcpCfg ??
+		((next: Partial<typeof mcpCfgLocal>) =>
+			setMcpCfgLocal((prev) => ({ ...prev, ...next })))
 
 	useEffect(() => {
 		// Sync selected widgets with template definition
@@ -211,6 +237,16 @@ export default function IntegratedWidgetManager(
 						width={scrapeCfg.width}
 						height={scrapeCfg.height}
 						onChange={updateScrapeCfg}
+					/>
+				)
+
+			case 'mcp':
+				return (
+					<MCPWidget
+						serverId={mcpCfg.serverId}
+						toolName={mcpCfg.toolName}
+						arguments={mcpCfg.arguments}
+						onChange={updateMcpCfg}
 					/>
 				)
 
