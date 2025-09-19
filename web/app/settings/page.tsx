@@ -259,6 +259,27 @@ export default function SettingsPage() {
 
 			<hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
 			
+			<h2>MCP設定</h2>
+			<p>Model Context Protocol (MCP) サーバーの設定を管理します。</p>
+			<div style={{ margin: '16px 0' }}>
+				<a
+					href="/mcp-settings"
+					target="_blank"
+					style={{
+						display: 'inline-block',
+						padding: '8px 16px',
+						backgroundColor: 'var(--color-primary)',
+						color: 'white',
+						textDecoration: 'none',
+						borderRadius: '4px',
+					}}
+				>
+					MCP設定ページを開く
+				</a>
+			</div>
+
+			<hr style={{ margin: '2rem 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+			
 			<h2>テーマ設定</h2>
 			<p>アプリケーションの表示テーマを切り替えることができます。</p>
 			<ThemeToggle />
