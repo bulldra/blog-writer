@@ -6,6 +6,7 @@ import {
 	Draggable,
 	type DropResult,
 } from '@hello-pangea/dnd'
+import IntegratedWidgetManager from '../../components/IntegratedWidgetManager'
 
 type Field = { key: string; label: string; input_type: 'text' | 'textarea' }
 type Widget = { id: string; name: string; description: string }
@@ -427,6 +428,34 @@ export default function ArticleTemplatesPage() {
 						</button>
 						{savedMsg && <span>{savedMsg}</span>}
 					</div>
+
+					{/* プロパティセット専用編集セクション */}
+					{tpl.widgets.includes('properties') && (
+						<div>
+							<strong>プロパティセット設定</strong>
+							<div style={{ marginTop: 8, padding: 12, border: '1px solid #ddd', borderRadius: 4 }}>
+								<IntegratedWidgetManager
+									articleTplDef={tpl}
+									articleTplFields={{}}
+									onFieldChange={() => {}}
+									onFieldsChange={(fields) => setTpl({ ...tpl, fields })}
+									editableProperties={true}
+									urlCtx=""
+									onChangeUrlCtx={() => {}}
+									obsBooks={[]}
+									bookFilter=""
+									selectedBook=""
+									highlights={[]}
+									obsidianError=""
+									onBookFilterChange={() => {}}
+									onBookSelect={() => {}}
+									savedPosts={[]}
+									selectedPost=""
+									onPostSelect={() => {}}
+								/>
+							</div>
+						</div>
+					)}
 
 					{/* 入力項目セクションはプロパティセットウィジェットへ統合のため削除 */}
 
