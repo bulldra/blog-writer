@@ -40,7 +40,9 @@ class GenericMCPClient:
 
             client = Client(transport=transport, name="generic-mcp")
             self._session = await client.__aenter__()
-            logger.info(f"Connected to MCP server: {self.config.get('name', 'unknown')}")
+            logger.info(
+                f"Connected to MCP server: {self.config.get('name', 'unknown')}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to connect to MCP server: {e}")
@@ -64,27 +66,29 @@ class GenericMCPClient:
 
         try:
             result = await self._session.list_tools()
-            return result.tools if hasattr(result, 'tools') else []
+            return result.tools if hasattr(result, "tools") else []
         except Exception as e:
             logger.error(f"Failed to list tools: {e}")
             return []
 
-    async def call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    async def call_tool(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> Optional[str]:
         """Call a tool on the MCP server."""
         if not self._session:
             raise RuntimeError("Not connected to MCP server")
 
         try:
             result = await self._session.call_tool(name=tool_name, arguments=arguments)
-            if hasattr(result, 'content') and result.content:
+            if hasattr(result, "content") and result.content:
                 # Extract text from tool result
                 content = result.content
                 if isinstance(content, list) and len(content) > 0:
                     first_item = content[0]
-                    if hasattr(first_item, 'text'):
+                    if hasattr(first_item, "text"):
                         return str(first_item.text)
-                    elif isinstance(first_item, dict) and 'text' in first_item:
-                        return str(first_item['text'])
+                    elif isinstance(first_item, dict) and "text" in first_item:
+                        return str(first_item["text"])
                 elif isinstance(content, str):
                     return content
             return None

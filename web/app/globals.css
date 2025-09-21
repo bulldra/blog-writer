@@ -10,6 +10,7 @@
 	--sidebar-hover: #0b1220;
 	--input-bg: #fff;
 	--input-border: #ccc;
+	--row-hover-bg: #eef5ff; /* subtle blue-ish */
 }
 
 [data-theme='dark'] {
@@ -24,6 +25,7 @@
 	--sidebar-hover: #0f172a;
 	--input-bg: #1e293b;
 	--input-border: #475569;
+	--row-hover-bg: #0f223a; /* subtle highlight for dark */
 }
 
 * {
@@ -39,6 +41,18 @@ body {
 	background: var(--bg-color);
 	color: var(--text-color);
 	transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Tables */
+.table-row {
+	transition: background-color 0.12s ease;
+}
+.table-row:hover {
+	background: var(--row-hover-bg);
+}
+.table-row:focus-visible {
+	outline: 2px solid var(--border-color-hover);
+	outline-offset: -2px;
 }
 button {
 	padding: 8px 12px;

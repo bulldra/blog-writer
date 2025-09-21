@@ -12,7 +12,8 @@ import MCPWidget from './MCPWidget'
 type TemplateField = {
 	key: string
 	label: string
-	input_type: 'text' | 'textarea'
+	input_type: 'text' | 'textarea' | 'date' | 'select'
+	options?: string[]
 }
 
 type TemplateDef = {

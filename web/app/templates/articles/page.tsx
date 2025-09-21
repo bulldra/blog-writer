@@ -8,7 +8,12 @@ import {
 } from '@hello-pangea/dnd'
 import IntegratedWidgetManager from '../../components/IntegratedWidgetManager'
 
-type Field = { key: string; label: string; input_type: 'text' | 'textarea' }
+type Field = {
+	key: string
+	label: string
+	input_type: 'text' | 'textarea' | 'date' | 'select'
+	options?: string[]
+}
 type Widget = { id: string; name: string; description: string }
 type ArticleTemplate = {
 	type: 'url' | 'note' | 'review'
@@ -372,15 +377,15 @@ export default function ArticleTemplatesPage() {
 			setExecuting(true)
 			setErrorMsg('')
 			setExecuteResult('')
-			
+
 			// デモ用のサンプルデータ
 			const sampleTitle = '新しい記事のタイトル'
 			const sampleBullets = [
 				'ポイント1: 重要な内容について説明',
 				'ポイント2: 具体例を挙げて解説',
-				'ポイント3: まとめと今後の展望'
+				'ポイント3: まとめと今後の展望',
 			]
-			
+
 			// プロンプトテンプレートを実行
 			const res = await fetch(`${API_BASE}/api/ai/from-bullets`, {
 				method: 'POST',
@@ -391,12 +396,16 @@ export default function ArticleTemplatesPage() {
 					style: '丁寧で分かりやすい文体',
 					length: '中程度（1000-1500文字）',
 					prompt_template: tpl.prompt_template,
-					url_context: tpl.widgets?.includes('url_context') ? 'https://example.com' : undefined,
-					highlights: tpl.widgets?.includes('kindle') ? ['サンプルハイライト'] : undefined,
+					url_context: tpl.widgets?.includes('url_context')
+						? 'https://example.com'
+						: undefined,
+					highlights: tpl.widgets?.includes('kindle')
+						? ['サンプルハイライト']
+						: undefined,
 					extra_context: {},
 				}),
 			})
-			
+
 			if (res.ok) {
 				const json = await res.json()
 				setExecuteResult(String(json.text || ''))
@@ -487,12 +496,20 @@ export default function ArticleTemplatesPage() {
 					{tpl.widgets.includes('properties') && (
 						<div>
 							<strong>プロパティセット設定</strong>
-							<div style={{ marginTop: 8, padding: 12, border: '1px solid #ddd', borderRadius: 4 }}>
+							<div
+								style={{
+									marginTop: 8,
+									padding: 12,
+									border: '1px solid #ddd',
+									borderRadius: 4,
+								}}>
 								<IntegratedWidgetManager
 									articleTplDef={tpl}
 									articleTplFields={{}}
 									onFieldChange={() => {}}
-									onFieldsChange={(fields) => setTpl({ ...tpl, fields })}
+									onFieldsChange={(fields) =>
+										setTpl({ ...tpl, fields })
+									}
 									editableProperties={true}
 									urlCtx=""
 									onChangeUrlCtx={() => {}}
@@ -824,19 +841,30 @@ export default function ArticleTemplatesPage() {
 							<button onClick={aiPropose}>
 								ウィジェットに基づき提案
 							</button>
-							<button 
-								onClick={executeTemplate} 
-								disabled={executing || !tpl?.prompt_template?.trim()}
+							<button
+								onClick={executeTemplate}
+								disabled={
+									executing || !tpl?.prompt_template?.trim()
+								}
 								style={{
-									backgroundColor: executing || !tpl?.prompt_template?.trim() ? '#ccc' : '#4CAF50',
+									backgroundColor:
+										executing ||
+										!tpl?.prompt_template?.trim()
+											? '#ccc'
+											: '#4CAF50',
 									color: 'white',
 									border: 'none',
 									padding: '8px 16px',
 									borderRadius: '4px',
-									cursor: executing || !tpl?.prompt_template?.trim() ? 'not-allowed' : 'pointer'
-								}}
-							>
-								{executing ? 'テンプレート実行中…' : 'テンプレートを実行'}
+									cursor:
+										executing ||
+										!tpl?.prompt_template?.trim()
+											? 'not-allowed'
+											: 'pointer',
+								}}>
+								{executing
+									? 'テンプレート実行中…'
+									: 'テンプレートを実行'}
 							</button>
 						</div>
 						<textarea
@@ -916,7 +944,7 @@ export default function ArticleTemplatesPage() {
 					{executeResult && (
 						<div style={{ marginTop: 20 }}>
 							<strong>テンプレート実行結果</strong>
-							<div 
+							<div
 								style={{
 									marginTop: 8,
 									padding: 12,
@@ -926,9 +954,8 @@ export default function ArticleTemplatesPage() {
 									whiteSpace: 'pre-wrap',
 									fontSize: 14,
 									maxHeight: 400,
-									overflow: 'auto'
-								}}
-							>
+									overflow: 'auto',
+								}}>
 								{executeResult}
 							</div>
 						</div>

@@ -34,7 +34,9 @@ class MCPSettings(BaseModel):
     servers: Dict[str, MCPServerConfig] = Field(
         default={}, description="Dictionary of MCP server configurations"
     )
-    enabled: bool = Field(default=False, description="Whether MCP integration is enabled")
+    enabled: bool = Field(
+        default=False, description="Whether MCP integration is enabled"
+    )
 
 
 class MCPTestRequest(BaseModel):
@@ -56,16 +58,13 @@ async def get_settings() -> MCPSettings:
     """Get MCP settings."""
     try:
         settings = get_mcp_settings()
-        
+
         # Convert server configs to Pydantic models
         servers = {}
         for server_id, config in settings.get("servers", {}).items():
             servers[server_id] = MCPServerConfig(**config)
-        
-        return MCPSettings(
-            servers=servers,
-            enabled=settings.get("enabled", False)
-        )
+
+        return MCPSettings(servers=servers, enabled=settings.get("enabled", False))
     except Exception as e:
         logger.error(f"Error getting MCP settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to get MCP settings")
@@ -79,7 +78,7 @@ async def save_settings(settings: MCPSettings) -> Dict[str, str]:
         servers = {}
         for server_id, config in settings.servers.items():
             servers[server_id] = config.model_dump()
-        
+
         save_mcp_settings(servers=servers, enabled=settings.enabled)
         return {"status": "saved"}
     except Exception as e:
@@ -126,13 +125,13 @@ async def test_connection(request: MCPTestRequest) -> Dict[str, Any]:
     try:
         settings = get_mcp_settings()
         servers = settings.get("servers", {})
-        
+
         if request.server_id not in servers:
             raise HTTPException(status_code=404, detail="Server not found")
-        
+
         server_config = servers[request.server_id]
         success = await test_mcp_connection(server_config)
-        
+
         return {"success": success}
     except HTTPException:
         raise
@@ -147,15 +146,15 @@ async def list_server_tools(server_id: str) -> Dict[str, Any]:
     try:
         settings = get_mcp_settings()
         servers = settings.get("servers", {})
-        
+
         if server_id not in servers:
             raise HTTPException(status_code=404, detail="Server not found")
-        
+
         server_config = servers[server_id]
-        
+
         if not server_config.get("enabled", False):
             raise HTTPException(status_code=400, detail="Server is not enabled")
-        
+
         async with GenericMCPClient(server_config) as client:
             tools = await client.list_tools()
             return {"tools": tools}
@@ -172,15 +171,15 @@ async def call_tool(request: MCPToolCallRequest) -> Dict[str, Any]:
     try:
         settings = get_mcp_settings()
         servers = settings.get("servers", {})
-        
+
         if request.server_id not in servers:
             raise HTTPException(status_code=404, detail="Server not found")
-        
+
         server_config = servers[request.server_id]
-        
+
         if not server_config.get("enabled", False):
             raise HTTPException(status_code=400, detail="Server is not enabled")
-        
+
         async with GenericMCPClient(server_config) as client:
             result = await client.call_tool(request.tool_name, request.arguments)
             return {"result": result}

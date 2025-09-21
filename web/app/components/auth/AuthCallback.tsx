@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Cookies from 'js-cookie'
+import { setCookie } from '../../utils/cookies'
 
 export default function AuthCallback() {
 	const router = useRouter()
@@ -18,8 +18,8 @@ export default function AuthCallback() {
 					const data = await response.json()
 
 					// トークンをCookieに保存
-					Cookies.set('auth_token', data.access_token, {
-						expires: 7, // 7日間
+					setCookie('auth_token', data.access_token, {
+						days: 7,
 						secure: process.env.NODE_ENV === 'production',
 						sameSite: 'lax',
 					})

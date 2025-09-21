@@ -24,7 +24,6 @@ export default function ArticleTemplateSelector({
 	articleTpl,
 	articleTplList,
 	onChangeArticleTpl,
-	articleTplDef,
 }: Props) {
 	return (
 		<div className="component-container">

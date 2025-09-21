@@ -1,6 +1,5 @@
 """Test MCP functionality."""
 
-
 from app.storage import (
     add_mcp_server,
     get_mcp_settings,
@@ -66,7 +65,7 @@ class TestMCPStorage:
             remove_mcp_server("test-server")
         except Exception:
             pass  # Ignore if server doesn't exist
-        
+
         # Get initial settings
         get_mcp_settings()
 

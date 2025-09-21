@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
 	DragDropContext,
 	Droppable,
@@ -8,14 +8,23 @@ import {
 	type DropResult,
 } from '@hello-pangea/dnd'
 import { useRouter } from 'next/navigation'
+import ScrapeWidget from '../../components/ScrapeWidget'
+import XWidget, {
+	type XWidgetState,
+	type XPreviewMode,
+} from '../../components/XWidget'
 
+// 型定義
 type Field = {
 	key: string
 	label: string
-	input_type: 'text' | 'textarea'
+	input_type: 'text' | 'textarea' | 'date' | 'select'
+	options?: string[]
 }
-type Widget = { id: string; name: string; description: string }
-type ArticleTemplate = {
+
+type WidgetMeta = { id: string; name: string; description: string }
+
+type ServerArticleTemplate = {
 	type: string
 	name: string
 	description?: string
@@ -24,7 +33,32 @@ type ArticleTemplate = {
 	widgets?: string[]
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
+type UIWidget = { id: string; uid: string }
+
+type ScrapeState = {
+	url: string
+	selector: string
+	mode: 'text' | 'screenshot' | 'both'
+	timeoutMs: number
+	headless: boolean
+	width: number
+	height: number
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000'
+
+function newUid(): string {
+	return `w_${Date.now().toString(36)}_${Math.random()
+		.toString(36)
+		.slice(2, 8)}`
+}
+
+function getMaxPosts(state?: Partial<XWidgetState>): number {
+	const legacy: number | undefined = (
+		state as { max_posts?: number } | undefined
+	)?.max_posts
+	return state?.maxPosts ?? legacy ?? 20
+}
 
 export default function TemplateDetailPage({
 	params,
@@ -33,361 +67,158 @@ export default function TemplateDetailPage({
 }) {
 	const router = useRouter()
 	const { type } = params
-	const [row, setRow] = useState<ArticleTemplate | null>(null)
-	const [availableWidgets, setAvailableWidgets] = useState<Widget[]>([])
+
+	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
-	const [proposing, setProposing] = useState(false)
-	const [executing, setExecuting] = useState(false)
 	const [error, setError] = useState('')
-	const [executeResult, setExecuteResult] = useState('')
+	const [proposing, setProposing] = useState(false)
 
 	const [name, setName] = useState('')
-	const [fields, setFields] = useState<Field[]>([])
 	const [description, setDescription] = useState('')
-	const [widgets, setWidgets] = useState<string[]>([])
+	const [fields, setFields] = useState<Field[]>([])
 	const [promptText, setPromptText] = useState('')
-	const promptRef = useRef<HTMLTextAreaElement | null>(null)
-	const [suggestOpen, setSuggestOpen] = useState(false)
-	const [suggestQuery, setSuggestQuery] = useState('')
-	const [suggestItems, setSuggestItems] = useState<string[]>([])
-	const [suggestIndex, setSuggestIndex] = useState(0)
+	const [widgets, setWidgets] = useState<UIWidget[]>([])
+	const [availableWidgets, setAvailableWidgets] = useState<WidgetMeta[]>([])
 
+	const [scrapeMap, setScrapeMap] = useState<
+		Record<string, Partial<ScrapeState>>
+	>({})
+	const [xMap, setXMap] = useState<Record<string, Partial<XWidgetState>>>({})
+
+	// 入力項目（フィールド）の編集ユーティリティ
+	const sanitizeKey = (s: string): string => {
+		const t = s
+			.toLowerCase()
+			.replace(/[^a-z0-9_\-]/g, '-')
+			.replace(/\-+/g, '-')
+			.trim()
+		return t || 'field'
+	}
+
+	const ensureUniqueKey = (base: string, idx?: number): string => {
+		const b = sanitizeKey(base)
+		const keys = fields.map((f, i) => (i === idx ? '__me__' : f.key))
+		if (!keys.includes(b)) return b
+		let i = 2
+		while (keys.includes(`${b}-${i}`)) i += 1
+		return `${b}-${i}`
+	}
+
+	const addTextField = () => {
+		const n = fields.length + 1
+		const key = ensureUniqueKey(`field-${n}`)
+		setFields((prev) => [
+			...prev,
+			{ key, label: `項目 ${n}`, input_type: 'text' },
+		])
+	}
+
+	const addSelectField = () => {
+		const n = fields.length + 1
+		const key = ensureUniqueKey(`select-${n}`)
+		setFields((prev) => [
+			...prev,
+			{ key, label: `選択 ${n}`, input_type: 'select', options: [] },
+		])
+	}
+
+	const quickAdd = (k: 'theme' | 'goal' | 'audience' | 'tone') => {
+		const exists = fields.some((f) => f.key === k)
+		if (exists) return
+		const labels: Record<typeof k, string> = {
+			theme: 'テーマ',
+			goal: '目的',
+			audience: '読者',
+			tone: 'トーン',
+		}
+		setFields((prev) => [
+			...prev,
+			{ key: k, label: labels[k], input_type: 'text' },
+		])
+	}
+
+	const updateField = (
+		index: number,
+		patch: Partial<Field>,
+		{ sanitizeKeyOnly = false }: { sanitizeKeyOnly?: boolean } = {}
+	) => {
+		setFields((prev) => {
+			const arr = [...prev]
+			const old = arr[index]
+			if (!old) return prev
+			let next: Field = { ...old, ...patch }
+			if (patch.key !== undefined) {
+				const base = sanitizeKey(String(patch.key))
+				next.key = ensureUniqueKey(base, index)
+			} else if (sanitizeKeyOnly) {
+				next.key = ensureUniqueKey(sanitizeKey(old.key), index)
+			}
+			if (patch.input_type && patch.input_type !== 'select') {
+				next = {
+					key: next.key,
+					label: next.label,
+					input_type:
+						(patch.input_type as Field['input_type']) ||
+						(next.input_type as Field['input_type']),
+				}
+			}
+			if (patch.options) {
+				const opts = (patch.options || [])
+					.map((o) => String(o).trim())
+					.filter((o) => !!o)
+				next.options = Array.from(new Set(opts))
+			}
+			arr[index] = next
+			return arr
+		})
+	}
+
+	const removeFieldRow = (index: number) => {
+		setFields((prev) => prev.filter((_, i) => i !== index))
+	}
+
+	// 初期ロード
 	useEffect(() => {
+		let mounted = true
 		;(async () => {
 			try {
-				const r = await fetch(
-					`${API_BASE}/api/article-templates/${encodeURIComponent(
-						type
-					)}`
-				)
-				if (r.ok) {
-					const j = (await r.json()) as ArticleTemplate
-					setRow(j)
+				const [wres, tres] = await Promise.all([
+					fetch(
+						`${API_BASE}/api/article-templates/widgets/available`
+					),
+					fetch(
+						`${API_BASE}/api/article-templates/${encodeURIComponent(
+							type
+						)}`
+					),
+				])
+				if (mounted && wres.ok) {
+					const data = await wres.json()
+					setAvailableWidgets(
+						Array.isArray(data.widgets) ? data.widgets : []
+					)
 				}
-			} catch {}
+				if (mounted && tres.ok) {
+					const t = (await tres.json()) as ServerArticleTemplate
+					setName(String(t.name || ''))
+					setDescription(String(t.description || ''))
+					setFields(Array.isArray(t.fields) ? t.fields : [])
+					setPromptText(String(t.prompt_template || ''))
+					const wids = Array.isArray(t.widgets) ? t.widgets : []
+					setWidgets(wids.map((id) => ({ id, uid: newUid() })))
+				}
+			} catch {
+				if (mounted) setError('読み込みに失敗しました')
+			} finally {
+				if (mounted) setLoading(false)
+			}
 		})()
+		return () => {
+			mounted = false
+		}
 	}, [type])
 
-	useEffect(() => {
-		;(async () => {
-			try {
-				const r = await fetch(
-					`${API_BASE}/api/article-templates/widgets/available`
-				)
-				if (r.ok) {
-					const data = await r.json()
-					setAvailableWidgets(data.widgets || [])
-				}
-			} catch {}
-		})()
-	}, [])
-
-	useEffect(() => {
-		if (!row) return
-		setName(row.name || row.type)
-		setFields(
-			(row.fields || []).map((f) => ({
-				key: f.key || '',
-				label: f.label || f.key || '',
-				input_type: (f.input_type as Field['input_type']) || 'text',
-			}))
-		)
-		setPromptText(row.prompt_template || '')
-		setWidgets(Array.isArray(row.widgets) ? row.widgets! : [])
-		setDescription(row.description || '')
-		setError('')
-	}, [row])
-
-	const variableCandidates = useMemo(() => {
-		const base = ['title', 'style', 'length', 'bullets', 'base']
-		const extra: string[] = []
-		if (widgets.includes('url_context')) extra.push('url_context')
-		if (widgets.includes('kindle')) extra.push('highlights')
-		if (widgets.includes('past_posts')) extra.push('past_posts')
-		const fieldKeys = widgets.includes('properties')
-			? fields.map((f) => (f.key || '').trim()).filter(Boolean)
-			: []
-		return Array.from(new Set([...base, ...extra, ...fieldKeys]))
-	}, [widgets, fields])
-
-	const validate = (): string => {
-		const keyRe = /^[a-z0-9_\-]+$/
-		const keys = new Set<string>()
-		for (const f of fields) {
-			const k = (f.key || '').trim().toLowerCase()
-			const label = (f.label || '').trim()
-			if (!k || !label) return 'キーとラベルは必須です'
-			if (!keyRe.test(k)) return 'キーは英数・_・- のみ使用できます'
-			if (keys.has(k)) return `キーが重複しています: ${k}`
-			keys.add(k)
-		}
-		if (fields.length > 30) return '項目は最大 30 個までです'
-		return ''
-	}
-
-	const save = async () => {
-		if (!row) return
-		setSaving(true)
-		setError('')
-		try {
-			const verr = validate()
-			if (verr) {
-				setError(verr)
-				return
-			}
-			const res = await fetch(
-				`${API_BASE}/api/article-templates/${encodeURIComponent(
-					row.type
-				)}`,
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name,
-						description,
-						fields,
-						prompt_template: promptText,
-						widgets,
-					}),
-				}
-			)
-			if (!res.ok) {
-				let msg = ''
-				try {
-					const j = await res.json()
-					msg = j?.detail || ''
-				} catch {}
-				setError(msg || '保存に失敗しました')
-				return
-			}
-			const saved = (await res.json()) as ArticleTemplate
-			setRow(saved)
-		} catch {
-			setError('保存に失敗しました')
-		} finally {
-			setSaving(false)
-		}
-	}
-
-	const aiPropose = async () => {
-		try {
-			setProposing(true)
-			const enabled = widgets
-			const widgetMeta = availableWidgets
-				.filter((w) => enabled.includes(w.id))
-				.map((w) => `${w.id}: ${w.name} — ${w.description}`)
-				.join('\n')
-			const placeholdersBase = [
-				'title',
-				'style',
-				'length',
-				'bullets',
-				'base',
-			]
-			const extra: string[] = []
-			if (enabled.includes('url_context')) extra.push('url_context')
-			if (enabled.includes('kindle')) extra.push('highlights')
-			if (enabled.includes('past_posts')) extra.push('past_posts')
-			const fieldKeys = enabled.includes('properties')
-				? fields.map((f) => (f.key || '').trim()).filter(Boolean)
-				: []
-			const placeholders = [...placeholdersBase, ...extra, ...fieldKeys]
-			const fieldsSpec = fields.map((f) => ({
-				key: f.key,
-				label: f.label,
-				input_type: f.input_type,
-			}))
-			const prompt = [
-				'あなたはブログ記事生成プロンプトの設計アシスタントです。',
-				'現在のテンプレートで有効なウィジェット一覧:',
-				widgetMeta || '(なし)',
-				'',
-				'利用可能なプレースホルダー（{{var}} 形式で使用）:',
-				placeholders.map((p) => `- {{${p}}}`).join('\n'),
-				'',
-				'ユーザが入力可能なプロパティ一覧（任意）:',
-				JSON.stringify(fieldsSpec, null, 2),
-				'',
-				'上記を踏まえ、記事生成に適したプロンプトテンプレートを日本語で提案してください。',
-				'要件:',
-				'- そのまま貼り付けて使えるテンプレート本文のみを出力（説明文やコードフェンスは不要）',
-				'- {{base}} セクションを中核に、利用可能なプレースホルダーを活用する',
-				'- ウィジェットが無い要素には依存しない（例: Kindleが無ければ {{highlights}} を使わない）',
-			].join('\n')
-			const res = await fetch('/api/ai/generate', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ prompt }),
-			})
-			if (res.ok) {
-				const json = await res.json()
-				setPromptText(String(json.text || ''))
-			}
-		} catch {
-		} finally {
-			setProposing(false)
-		}
-	}
-
-	const executeTemplate = async () => {
-		if (!promptText.trim()) {
-			setError('実行するプロンプトテンプレートがありません')
-			return
-		}
-		try {
-			setExecuting(true)
-			setError('')
-			setExecuteResult('')
-			
-			// デモ用のサンプルデータ
-			const sampleTitle = '新しい記事のタイトル'
-			const sampleBullets = [
-				'ポイント1: 重要な内容について説明',
-				'ポイント2: 具体例を挙げて解説',
-				'ポイント3: まとめと今後の展望'
-			]
-			
-			// プロンプトテンプレートを実行
-			const res = await fetch(`${API_BASE}/api/ai/from-bullets`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					bullets: sampleBullets,
-					title: sampleTitle,
-					style: '丁寧で分かりやすい文体',
-					length: '中程度（1000-1500文字）',
-					prompt_template: promptText,
-					url_context: widgets.includes('url_context') ? 'https://example.com' : undefined,
-					highlights: widgets.includes('kindle') ? ['サンプルハイライト'] : undefined,
-					extra_context: {},
-				}),
-			})
-			
-			if (res.ok) {
-				const json = await res.json()
-				setExecuteResult(String(json.text || ''))
-			} else {
-				setError('テンプレートの実行に失敗しました')
-			}
-		} catch (err) {
-			setError('テンプレートの実行中にエラーが発生しました')
-		} finally {
-			setExecuting(false)
-		}
-	}
-
-	// const updateField = (idx: number, key: keyof Field, val: string) => {
-	// 	setFields((prev) => {
-	// 		const next = [...prev]
-	// 		next[idx] = { ...next[idx], [key]: val }
-	// 		return next
-	// 	})
-	// 	setError('')
-	// }
-	// const addField = () => {
-	// 	if (fields.length >= 30) {
-	// 		setError('項目は最大 30 個までです')
-	// 		return
-	// 	}
-	// 	setFields((prev) => [
-	// 		...prev,
-	// 		{ key: '', label: '', input_type: 'text' },
-	// 	])
-	// }
-	// const removeField = (idx: number) => {
-	// 	setFields((prev) => prev.filter((_, i) => i !== idx))
-	// 	setError('')
-	// }
-
-	const varsForWidget = (widgetId: string): string[] => {
-		if (widgetId === 'properties')
-			return fields.map((f) => (f.key || '').trim()).filter(Boolean)
-		if (widgetId === 'url_context') return ['url_context']
-		if (widgetId === 'kindle') return ['highlights']
-		if (widgetId === 'past_posts') return ['past_posts']
-		return []
-	}
-
-	const insertVariableFromSuggest = (name: string) => {
-		const ta = promptRef.current
-		if (!ta) return
-		const pos = ta.selectionStart ?? 0
-		const text = promptText
-		const left = text.slice(0, pos)
-		const right = text.slice(pos)
-		const atPos = left.lastIndexOf('@')
-		if (atPos === -1) return
-		const newLeft = left.slice(0, atPos) + `{{${name}}}`
-		const next = newLeft + right
-		setPromptText(next)
-		requestAnimationFrame(() => {
-			const el = promptRef.current
-			if (!el) return
-			const newPos = newLeft.length
-			el.selectionStart = newPos
-			el.selectionEnd = newPos
-			el.focus()
-		})
-		setSuggestOpen(false)
-	}
-
-	const updateSuggestFromCaret = () => {
-		const ta = promptRef.current
-		if (!ta) return
-		const pos = ta.selectionStart ?? 0
-		const text = promptText
-		const left = text.slice(0, pos)
-		const atPos = left.lastIndexOf('@')
-		if (atPos === -1) {
-			setSuggestOpen(false)
-			return
-		}
-		const between = left.slice(atPos + 1)
-		if (/[^a-zA-Z0-9_\-]/.test(between) && between.length > 0) {
-			setSuggestOpen(false)
-			return
-		}
-		const prefix = between
-		const items = variableCandidates
-			.filter((v) => v.startsWith(prefix))
-			.slice(0, 8)
-		if (items.length === 0) {
-			setSuggestOpen(false)
-			return
-		}
-		setSuggestItems(items)
-		setSuggestIndex(0)
-		setSuggestQuery(prefix)
-		setSuggestOpen(true)
-	}
-
-	const onPromptKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (
-		e
-	) => {
-		if (!suggestOpen) return
-		if (e.key === 'ArrowDown') {
-			e.preventDefault()
-			setSuggestIndex((i) => (i + 1) % suggestItems.length)
-			return
-		}
-		if (e.key === 'ArrowUp') {
-			e.preventDefault()
-			setSuggestIndex(
-				(i) => (i - 1 + suggestItems.length) % suggestItems.length
-			)
-			return
-		}
-		if (e.key === 'Enter' || e.key === 'Tab') {
-			e.preventDefault()
-			insertVariableFromSuggest(suggestItems[suggestIndex])
-			return
-		}
-		if (e.key === 'Escape') {
-			e.preventDefault()
-			setSuggestOpen(false)
-		}
-	}
-
+	// DnD: widgets / fields 並べ替え
 	const onDragEnd = (result: DropResult) => {
 		const { destination, source } = result
 		if (!destination) return
@@ -396,22 +227,190 @@ export default function TemplateDetailPage({
 			destination.index === source.index
 		)
 			return
-		setWidgets((prev) => {
-			const arr = [...prev]
-			const [m] = arr.splice(source.index, 1)
-			arr.splice(destination.index, 0, m)
-			return arr
-		})
+		if (
+			source.droppableId === 'widgets' &&
+			destination.droppableId === 'widgets'
+		) {
+			setWidgets((prev) => {
+				const arr = [...prev]
+				const [m] = arr.splice(source.index, 1)
+				arr.splice(destination.index, 0, m)
+				return arr
+			})
+			return
+		}
+		if (
+			source.droppableId === 'fields' &&
+			destination.droppableId === 'fields'
+		) {
+			setFields((prev) => {
+				const arr = [...prev]
+				const [m] = arr.splice(source.index, 1)
+				arr.splice(destination.index, 0, m as Field)
+				return arr
+			})
+			return
+		}
 	}
 
+	// 追加/削除
+	const addWidget = (id: string) => {
+		if (!id) return
+		setWidgets((prev) => [...prev, { id, uid: newUid() }])
+	}
+	const removeWidget = (uid: string) => {
+		setWidgets((prev) => prev.filter((w) => w.uid !== uid))
+	}
+
+	// 保存（PUT）
+	const save = async () => {
+		try {
+			setSaving(true)
+			setError('')
+			const payload: ServerArticleTemplate = {
+				type,
+				name: String(name || ''),
+				description: String(description || ''),
+				fields: fields.map((f) => ({
+					key: f.key,
+					label: f.label,
+					input_type: f.input_type,
+					options:
+						f.input_type === 'select' ? f.options || [] : undefined,
+				})),
+				prompt_template: String(promptText || ''),
+				widgets: widgets.map((w) => w.id),
+			}
+			const res = await fetch(
+				`${API_BASE}/api/article-templates/${encodeURIComponent(type)}`,
+				{
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload),
+				}
+			)
+			if (!res.ok) {
+				const text = await res.text().catch(() => '')
+				throw new Error(text || '保存に失敗しました')
+			}
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : String(e)
+			setError(msg || '保存に失敗しました')
+		} finally {
+			setSaving(false)
+		}
+	}
+
+	// LLM によるプロンプトテンプレート提案
+	const aiPropose = async () => {
+		try {
+			setProposing(true)
+			setError('')
+			const enabled = widgets.map((w) => w.id)
+			const widgetMeta = availableWidgets
+				.filter((w) => enabled.includes(w.id))
+				.map((w) => `${w.id}: ${w.name} — ${w.description}`)
+				.join('\n')
+
+			const placeholdersBase = [
+				'title',
+				'style',
+				'length',
+				'bullets',
+				'base',
+			]
+			const fieldKeys = (fields || [])
+				.map((f) => (f.key || '').trim())
+				.filter(Boolean)
+			const placeholders = Array.from(
+				new Set([...placeholdersBase, ...fieldKeys])
+			)
+
+			const fieldsSpec = (fields || []).map((f) => ({
+				key: f.key,
+				label: f.label,
+				input_type: f.input_type,
+			}))
+
+			const prompt = [
+				'あなたはブログ記事やメモ生成のプロンプト設計アシスタントです。',
+				'現在のテンプレートで有効なウィジェット一覧:',
+				widgetMeta || '(なし)',
+				'',
+				'利用可能なプレースホルダー（{{var}} 形式で使用）:',
+				placeholders.map((p) => `- {{${p}}}`).join('\n'),
+				'',
+				'ユーザが入力可能なフィールド一覧（任意）:',
+				JSON.stringify(fieldsSpec, null, 2),
+				'',
+				'上記を踏まえ、生成に適したプロンプトテンプレートを日本語で提案してください。',
+				'要件:',
+				'- そのまま貼り付けて使えるテンプレート本文のみを出力（説明やコードフェンスは不要）',
+				'- {{base}} を中核に、利用可能なプレースホルダーを必要に応じて活用する',
+				'- 無いウィジェット由来の変数には依存しない',
+			].join('\n')
+
+			const res = await fetch('/api/ai/generate', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ prompt }),
+			})
+			if (res.ok) {
+				const json = await res.json()
+				setPromptText(String(json.text || ''))
+			} else {
+				setError('提案の生成に失敗しました')
+			}
+		} catch (e) {
+			setError('提案の生成中にエラーが発生しました')
+		} finally {
+			setProposing(false)
+		}
+	}
+
+	// ウィジェットの変数ヒント
+	const varsForWidget = (widgetId: string): string[] => {
+		if (widgetId === 'scrape') return ['url', 'selector', 'mode']
+		if (widgetId === 'x') return ['url', 'mode', 'maxPosts']
+		return []
+	}
+
+	const previewSummary = useMemo(() => {
+		try {
+			const summary = {
+				type,
+				name,
+				description,
+				fields: fields.map((f) => ({
+					key: f.key,
+					label: f.label,
+					input_type: f.input_type,
+					options:
+						f.input_type === 'select' ? f.options || [] : undefined,
+				})),
+				widgets: widgets.map((w) => w.id),
+			}
+			return JSON.stringify(summary, null, 2)
+		} catch {
+			return ''
+		}
+	}, [type, name, description, fields, widgets])
+
+	if (loading) return <div style={{ padding: 12 }}>読み込み中…</div>
+
 	return (
-		<div style={{ maxWidth: 980, margin: '2rem auto', padding: '0 1rem' }}>
+		<div style={{ padding: 12 }}>
 			<button
 				onClick={() => router.push('/templates')}
 				style={{ marginBottom: 8 }}>
 				← 一覧へ
 			</button>
 			<h1>テンプレート編集: {type}</h1>
+
+			{error && (
+				<div style={{ color: '#a00', marginTop: 8 }}>{error}</div>
+			)}
+
 			<div
 				style={{
 					display: 'flex',
@@ -431,12 +430,276 @@ export default function TemplateDetailPage({
 					onChange={(e) => setDescription(e.target.value)}
 					style={{ flex: 2 }}
 				/>
-				<button onClick={aiPropose} disabled={proposing}>
-					{proposing ? '提案中…' : 'AIでプロンプト雛形を提案'}
+				<button onClick={save} disabled={saving}>
+					{saving ? '保存中…' : '保存'}
 				</button>
 			</div>
 
 			<div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+				{/* 入力項目（フィールド）設定 */}
+				<div>
+					<strong>入力項目（フィールド）</strong>
+					<div
+						style={{
+							display: 'flex',
+							gap: 6,
+							marginTop: 6,
+							alignItems: 'center',
+							flexWrap: 'wrap',
+						}}>
+						<button onClick={addTextField} style={{ fontSize: 12 }}>
+							+ テキスト項目
+						</button>
+						<button
+							onClick={addSelectField}
+							style={{ fontSize: 12 }}>
+							+ 選択項目
+						</button>
+						<span style={{ fontSize: 12, color: '#666' }}>
+							よく使う項目のクイック追加:
+						</span>
+						<button
+							onClick={() => quickAdd('theme')}
+							style={{ fontSize: 12 }}>
+							テーマ
+						</button>
+						<button
+							onClick={() => quickAdd('goal')}
+							style={{ fontSize: 12 }}>
+							目的
+						</button>
+						<button
+							onClick={() => quickAdd('audience')}
+							style={{ fontSize: 12 }}>
+							読者
+						</button>
+						<button
+							onClick={() => quickAdd('tone')}
+							style={{ fontSize: 12 }}>
+							トーン
+						</button>
+					</div>
+					{fields.length === 0 ? (
+						<div
+							style={{ fontSize: 12, color: '#666', padding: 8 }}>
+							入力項目は未設定です
+						</div>
+					) : (
+						<div style={{ border: '1px solid #ddd', marginTop: 6 }}>
+							<DragDropContext onDragEnd={onDragEnd}>
+								<Droppable droppableId="fields">
+									{(provided, snapshot) => (
+										<div
+											ref={provided.innerRef}
+											{...provided.droppableProps}
+											className={`dnd-list${
+												snapshot.isDraggingOver
+													? ' drag-over'
+													: ''
+											}`}>
+											{fields.map((f, i) => (
+												<Draggable
+													key={`field-${f.key}-${i}`}
+													draggableId={`field-${f.key}-${i}`}
+													index={i}>
+													{(
+														dragProvided,
+														dragSnapshot
+													) => (
+														<div
+															ref={
+																dragProvided.innerRef
+															}
+															{...dragProvided.draggableProps}
+															className={`dnd-item${
+																dragSnapshot.isDragging
+																	? ' dragging'
+																	: ''
+															}`}
+															style={{
+																padding: 6,
+																borderTop:
+																	i === 0
+																		? 'none'
+																		: '1px solid #eee',
+															}}>
+															<div
+																style={{
+																	display:
+																		'grid',
+																	gridTemplateColumns:
+																		'18px minmax(120px, 1fr) minmax(140px, 1fr) 130px 1fr 60px',
+																	gap: 6,
+																	alignItems:
+																		'center',
+																}}>
+																<span
+																	{...dragProvided.dragHandleProps}
+																	className="dnd-handle"
+																	title="ドラッグして移動"
+																	aria-label="ドラッグハンドル"
+																	style={{
+																		userSelect:
+																			'none',
+																	}}>
+																	≡
+																</span>
+																<input
+																	value={
+																		f.key
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateField(
+																			i,
+																			{
+																				key: e
+																					.target
+																					.value,
+																			}
+																		)
+																	}
+																	onBlur={() =>
+																		updateField(
+																			i,
+																			{},
+																			{
+																				sanitizeKeyOnly:
+																					true,
+																			}
+																		)
+																	}
+																	placeholder="key (a-z0-9_-)"
+																	title="キー（英数字・ハイフン・アンダースコア）"
+																/>
+																<input
+																	value={
+																		f.label
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateField(
+																			i,
+																			{
+																				label: e
+																					.target
+																					.value,
+																			}
+																		)
+																	}
+																	placeholder="ラベル"
+																/>
+																<select
+																	value={
+																		f.input_type
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateField(
+																			i,
+																			{
+																				input_type:
+																					e
+																						.target
+																						.value as Field['input_type'],
+																			}
+																		)
+																	}>
+																	<option value="text">
+																		text
+																	</option>
+																	<option value="textarea">
+																		textarea
+																	</option>
+																	<option value="date">
+																		date
+																	</option>
+																	<option value="select">
+																		select
+																	</option>
+																</select>
+																{f.input_type ===
+																'select' ? (
+																	<input
+																		value={(
+																			f.options ||
+																			[]
+																		).join(
+																			', '
+																		)}
+																		onChange={(
+																			e
+																		) =>
+																			updateField(
+																				i,
+																				{
+																					options:
+																						e.target.value
+																							.split(
+																								','
+																							)
+																							.map(
+																								(
+																									s
+																								) =>
+																									s.trim()
+																							)
+																							.filter(
+																								(
+																									s
+																								) =>
+																									!!s
+																							),
+																				}
+																			)
+																		}
+																		placeholder="選択肢（カンマ区切り）"
+																	/>
+																) : (
+																	<div
+																		style={{
+																			color: '#999',
+																			fontSize: 12,
+																		}}>
+																		{f.input_type ===
+																		'textarea'
+																			? '複数行入力'
+																			: f.input_type ===
+																			  'date'
+																			? '日付入力'
+																			: '単一行入力'}
+																	</div>
+																)}
+																<button
+																	onClick={() =>
+																		removeFieldRow(
+																			i
+																		)
+																	}
+																	style={{
+																		fontSize: 12,
+																		color: '#a00',
+																	}}
+																	title="削除">
+																	削除
+																</button>
+															</div>
+														</div>
+													)}
+												</Draggable>
+											))}
+											{provided.placeholder}
+										</div>
+									)}
+								</Droppable>
+							</DragDropContext>
+						</div>
+					)}
+				</div>
+
 				<div>
 					<strong>ウィジェット設定</strong>
 					<span className="dnd-hint">
@@ -475,7 +738,13 @@ export default function TemplateDetailPage({
 															: ''
 													}`}>
 													{widgets.map(
-														(widgetId, index) => {
+														(
+															{
+																id: widgetId,
+																uid,
+															},
+															index
+														) => {
 															const widget =
 																availableWidgets.find(
 																	(w) =>
@@ -484,11 +753,9 @@ export default function TemplateDetailPage({
 																)
 															return (
 																<Draggable
-																	key={
-																		widgetId
-																	}
+																	key={uid}
 																	draggableId={
-																		widgetId
+																		uid
 																	}
 																	index={
 																		index
@@ -506,15 +773,29 @@ export default function TemplateDetailPage({
 																				dragSnapshot.isDragging
 																					? ' dragging'
 																					: ''
-																			}`}>
+																			}`}
+																			style={{
+																				padding: 8,
+																				borderBottom:
+																					'1px solid #eee',
+																			}}>
 																			<span
 																				{...dragProvided.dragHandleProps}
 																				className="dnd-handle"
 																				title="ドラッグして移動"
-																				aria-label="ドラッグハンドル">
+																				aria-label="ドラッグハンドル"
+																				style={{
+																					marginRight: 8,
+																				}}>
 																				≡
 																			</span>
-																			<div className="dnd-item-main">
+																			<div
+																				className="dnd-item-main"
+																				style={{
+																					display:
+																						'grid',
+																					gap: 4,
+																				}}>
 																				<div
 																					style={{
 																						display:
@@ -523,67 +804,11 @@ export default function TemplateDetailPage({
 																						alignItems:
 																							'center',
 																					}}>
-																					<strong
-																						style={{
-																							flex: 1,
-																						}}>
+																					<strong>
 																						{widget
 																							? widget.name
 																							: widgetId}
 																					</strong>
-																					{(() => {
-																						const vs =
-																							varsForWidget(
-																								widgetId
-																							)
-																						if (
-																							vs.length ===
-																							0
-																						)
-																							return null
-																						return (
-																							<div
-																								style={{
-																									display:
-																										'flex',
-																									gap: 6,
-																									flexWrap:
-																										'wrap',
-																								}}>
-																								{vs.map(
-																									(
-																										v
-																									) => (
-																										<button
-																											key={
-																												v
-																											}
-																											onClick={() =>
-																												insertVariableFromSuggest(
-																													v
-																												)
-																											}
-																											style={{
-																												fontSize: 11,
-																												background:
-																													'#eef',
-																												border: '1px solid #ccd',
-																												padding:
-																													'1px 6px',
-																												borderRadius: 10,
-																												cursor: 'pointer',
-																											}}
-																											title="変数を挿入">
-																											@
-																											{
-																												v
-																											}
-																										</button>
-																									)
-																								)}
-																							</div>
-																						)
-																					})()}
 																					{widget && (
 																						<div
 																							style={{
@@ -595,19 +820,15 @@ export default function TemplateDetailPage({
 																							}
 																						</div>
 																					)}
+																					<div
+																						style={{
+																							flex: 1,
+																						}}
+																					/>
 																					<button
 																						onClick={() =>
-																							setWidgets(
-																								(
-																									prev
-																								) =>
-																									prev.filter(
-																										(
-																											id
-																										) =>
-																											id !==
-																											widgetId
-																									)
+																							removeWidget(
+																								uid
 																							)
 																						}
 																						style={{
@@ -620,6 +841,236 @@ export default function TemplateDetailPage({
 																						削除
 																					</button>
 																				</div>
+
+																				{(() => {
+																					const vs =
+																						varsForWidget(
+																							widgetId
+																						)
+																					if (
+																						vs.length ===
+																						0
+																					)
+																						return null
+																					return (
+																						<div
+																							style={{
+																								display:
+																									'flex',
+																								gap: 6,
+																								flexWrap:
+																									'wrap',
+																							}}>
+																							{vs.map(
+																								(
+																									v
+																								) => (
+																									<span
+																										key={
+																											v
+																										}
+																										style={{
+																											fontSize: 11,
+																											background:
+																												'#eef',
+																											border: '1px solid #ccd',
+																											padding:
+																												'1px 6px',
+																											borderRadius: 10,
+																										}}>
+																										@
+																										{
+																											v
+																										}
+																									</span>
+																								)
+																							)}
+																						</div>
+																					)
+																				})()}
+
+																				{widgetId ===
+																					'scrape' && (
+																					<ScrapeWidget
+																						url={
+																							scrapeMap[
+																								uid
+																							]
+																								?.url ||
+																							''
+																						}
+																						selector={
+																							scrapeMap[
+																								uid
+																							]
+																								?.selector ||
+																							'body'
+																						}
+																						mode={
+																							(scrapeMap[
+																								uid
+																							]
+																								?.mode as ScrapeState['mode']) ||
+																							'text'
+																						}
+																						timeoutMs={
+																							scrapeMap[
+																								uid
+																							]
+																								?.timeoutMs ??
+																							10000
+																						}
+																						headless={
+																							scrapeMap[
+																								uid
+																							]
+																								?.headless ??
+																							true
+																						}
+																						width={
+																							scrapeMap[
+																								uid
+																							]
+																								?.width ??
+																							1200
+																						}
+																						height={
+																							scrapeMap[
+																								uid
+																							]
+																								?.height ??
+																							800
+																						}
+																						apiBase={
+																							API_BASE
+																						}
+																						onChange={(
+																							patch: Partial<ScrapeState>
+																						) =>
+																							setScrapeMap(
+																								(
+																									prev
+																								) => ({
+																									...prev,
+																									[uid]: {
+																										url:
+																											prev[
+																												uid
+																											]
+																												?.url ||
+																											'',
+																										selector:
+																											prev[
+																												uid
+																											]
+																												?.selector ||
+																											'body',
+																										mode:
+																											(prev[
+																												uid
+																											]
+																												?.mode as ScrapeState['mode']) ||
+																											'text',
+																										timeoutMs:
+																											prev[
+																												uid
+																											]
+																												?.timeoutMs ??
+																											10000,
+																										headless:
+																											prev[
+																												uid
+																											]
+																												?.headless ??
+																											true,
+																										width:
+																											prev[
+																												uid
+																											]
+																												?.width ??
+																											1200,
+																										height:
+																											prev[
+																												uid
+																											]
+																												?.height ??
+																											800,
+																										...patch,
+																									},
+																								})
+																							)
+																						}
+																					/>
+																				)}
+
+																				{widgetId ===
+																					'x' && (
+																					<XWidget
+																						apiBase={
+																							API_BASE
+																						}
+																						state={{
+																							url: xMap[
+																								uid
+																							]
+																								?.url,
+																							mode:
+																								(xMap[
+																									uid
+																								]
+																									?.mode as XPreviewMode) ||
+																								'thread',
+																							maxPosts:
+																								getMaxPosts(
+																									xMap[
+																										uid
+																									]
+																								),
+																							rawText:
+																								xMap[
+																									uid
+																								]
+																									?.rawText ||
+																								'',
+																						}}
+																						onChange={(
+																							patch: Partial<XWidgetState>
+																						) =>
+																							setXMap(
+																								(
+																									prev
+																								) => ({
+																									...prev,
+																									[uid]: {
+																										url: prev[
+																											uid
+																										]
+																											?.url,
+																										mode:
+																											(prev[
+																												uid
+																											]
+																												?.mode as XPreviewMode) ||
+																											'thread',
+																										maxPosts:
+																											getMaxPosts(
+																												prev[
+																													uid
+																												]
+																											),
+																										rawText:
+																											prev[
+																												uid
+																											]
+																												?.rawText ||
+																											'',
+																										...patch,
+																									},
+																								})
+																							)
+																						}
+																					/>
+																				)}
 																			</div>
 																		</div>
 																	)}
@@ -650,27 +1101,18 @@ export default function TemplateDetailPage({
 								}}>
 								<select
 									value={''}
-									onChange={(e) => {
-										const id = e.target.value
-										if (!id) return
-										if (widgets.includes(id)) return
-										setWidgets((prev) => [...prev, id])
-									}}
+									onChange={(e) => addWidget(e.target.value)}
 									style={{ minWidth: 260 }}>
 									<option value="">
 										追加するウィジェットを選択
 									</option>
-									{availableWidgets
-										.filter((w) => !widgets.includes(w.id))
-										.map((w) => (
-											<option key={w.id} value={w.id}>
-												{w.name} — {w.description}
-											</option>
-										))}
+									{availableWidgets.map((w) => (
+										<option key={w.id} value={w.id}>
+											{w.name} — {w.description}
+										</option>
+									))}
 								</select>
-								{availableWidgets.filter(
-									(w) => !widgets.includes(w.id)
-								).length === 0 && (
+								{availableWidgets.length === 0 && (
 									<span
 										style={{ fontSize: 12, color: '#666' }}>
 										追加可能なウィジェットはありません
@@ -692,132 +1134,33 @@ export default function TemplateDetailPage({
 							flexWrap: 'wrap',
 						}}>
 						<button onClick={aiPropose} disabled={proposing}>
-							{proposing ? '提案中…' : 'ウィジェットに基づき提案'}
-						</button>
-						<button 
-							onClick={executeTemplate} 
-							disabled={executing || !promptText.trim()}
-							style={{
-								backgroundColor: executing ? '#ccc' : '#4CAF50',
-								color: 'white',
-								border: 'none',
-								padding: '8px 16px',
-								borderRadius: '4px',
-								cursor: executing || !promptText.trim() ? 'not-allowed' : 'pointer'
-							}}
-						>
-							{executing ? 'テンプレート実行中…' : 'テンプレートを実行'}
+							{proposing
+								? '提案を作成中…'
+								: 'ウィジェットに基づき提案'}
 						</button>
 					</div>
 					<textarea
-						ref={promptRef}
 						placeholder={
 							'{{base}}\n---\n{{bullets}}\n---\n任意の変数: {{title}}, {{style}}, {{length}}, {{highlights}}, {{url_context}} など'
 						}
 						value={promptText}
-						onChange={(e) => {
-							setPromptText(e.target.value)
-							updateSuggestFromCaret()
-						}}
-						onKeyDown={onPromptKeyDown}
-						onClick={updateSuggestFromCaret}
-						onKeyUp={updateSuggestFromCaret}
-						onBlur={() => setSuggestOpen(false)}
-						rows={12}
+						onChange={(e) => setPromptText(e.target.value)}
+						rows={10}
 						style={{ width: '100%', marginTop: 6 }}
 					/>
-					{suggestOpen && (
-						<div style={{ position: 'relative' }}>
-							<div
-								role="listbox"
-								style={{
-									position: 'absolute',
-									right: 0,
-									bottom: 4,
-									zIndex: 10,
-									background: '#fff',
-									border: '1px solid #ddd',
-									boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-									minWidth: 220,
-								}}>
-								<div
-									style={{
-										padding: '6px 8px',
-										borderBottom: '1px solid #eee',
-										fontSize: 12,
-										color: '#555',
-									}}>
-									@{suggestQuery}
-								</div>
-								{suggestItems.map((item, i) => (
-									<button
-										key={item}
-										onMouseDown={(e) => {
-											e.preventDefault()
-											insertVariableFromSuggest(item)
-										}}
-										style={{
-											display: 'block',
-											width: '100%',
-											textAlign: 'left',
-											padding: '6px 8px',
-											background:
-												i === suggestIndex
-													? '#eef5ff'
-													: '#fff',
-											borderBottom: '1px solid #f0f0f0',
-											cursor: 'pointer',
-											fontFamily: 'inherit',
-											fontSize: 13,
-										}}>
-										{'{{'}
-										{item}
-										{'}}'}
-									</button>
-								))}
-							</div>
-						</div>
-					)}
 				</div>
 
-				{/* テンプレート実行結果 */}
-				{executeResult && (
-					<div style={{ marginTop: 20 }}>
-						<strong>テンプレート実行結果</strong>
-						<div 
-							style={{
-								marginTop: 8,
-								padding: 12,
-								border: '1px solid #ddd',
-								borderRadius: 4,
-								backgroundColor: '#f9f9f9',
-								whiteSpace: 'pre-wrap',
-								fontSize: 14,
-								maxHeight: 400,
-								overflow: 'auto'
-							}}
-						>
-							{executeResult}
-						</div>
-					</div>
-				)}
-
-				<div
-					style={{
-						display: 'flex',
-						gap: 8,
-						alignItems: 'center',
-						flexWrap: 'wrap',
-						marginTop: 20,
-					}}>
-					<button onClick={save} disabled={saving}>
-						{saving ? '保存中…' : '保存'}
-					</button>
-					{error ? (
-						<span style={{ color: '#a00', fontSize: 12 }}>
-							{error}
-						</span>
-					) : null}
+				<div>
+					<strong>プレビュー</strong>
+					<pre
+						style={{
+							background: '#f7f7f7',
+							padding: 12,
+							whiteSpace: 'pre-wrap',
+							border: '1px solid #ddd',
+						}}>
+						{previewSummary}
+					</pre>
 				</div>
 			</div>
 		</div>

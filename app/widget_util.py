@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, TypeVar
 
 import httpx
 
@@ -13,6 +13,94 @@ from app.security import is_url_allowed
 from app.storage import get_mcp_settings, get_notion_settings
 
 logger = logging.getLogger(__name__)
+
+
+T = TypeVar("T")
+
+
+def _has_running_loop() -> bool:
+    try:
+        asyncio.get_running_loop()
+        return True
+    except RuntimeError:
+        return False
+
+
+def _run_coro_sync(factory: Callable[[], Awaitable[T]]) -> Optional[T]:
+    if _has_running_loop():
+        logger.warning("Cannot run in sync mode inside async context")
+        return None
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(factory())
+    except Exception as e:  # noqa: BLE001
+        logger.error("Error running coroutine sync: %s", e)
+        return None
+    finally:
+        try:
+            loop.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _process_text_sync(widget_type: str, widget_data: Dict[str, Any]) -> Optional[str]:
+    if not validate_widget_config(widget_type, widget_data):
+        return None
+    if widget_type == "notion":
+        return _run_coro_sync(lambda: process_notion_widget(widget_data))
+    if widget_type == "mcp":
+        return _run_coro_sync(lambda: process_mcp_widget(widget_data))
+    if widget_type == "url_context":
+        return _run_coro_sync(lambda: process_url_context_widget(widget_data))
+    if widget_type == "x":
+        try:
+            return process_x_widget(widget_data)
+        except Exception as e:  # noqa: BLE001
+            logger.error("Error processing x widget: %s", e)
+            return None
+    if widget_type == "scrape":
+        try:
+            text, _shot = _scrape_with_selenium_wrapper(widget_data)
+            return text
+        except Exception as e:  # noqa: BLE001
+            logger.error("Error in sync scrape: %s", e)
+            return None
+    return None
+
+
+def _process_text_media_sync(
+    widget_type: str, widget_data: Dict[str, Any]
+) -> Tuple[Optional[str], List[Tuple[str, bytes]]]:
+    if not validate_widget_config(widget_type, widget_data):
+        return None, []
+    media: List[Tuple[str, bytes]] = []
+    if widget_type == "notion":
+        text = _run_coro_sync(lambda: process_notion_widget(widget_data))
+        return text, media
+    if widget_type == "url_context":
+        text = _run_coro_sync(lambda: process_url_context_widget(widget_data))
+        return text, media
+    if widget_type == "x":
+        try:
+            text = process_x_widget(widget_data)
+            return text, media
+        except Exception as e:  # noqa: BLE001
+            logger.error("Error in sync x: %s", e)
+            return None, []
+    if widget_type == "scrape":
+        try:
+            text, shot = _scrape_with_selenium_wrapper(widget_data)
+            if shot:
+                media.append(("image/png", shot))
+            return text, media
+        except Exception as e:  # noqa: BLE001
+            logger.error("Error in sync scrape: %s", e)
+            return None, []
+    if widget_type == "mcp":
+        text = _run_coro_sync(lambda: process_mcp_widget(widget_data))
+        return text, media
+    return None, []
 
 
 async def process_mcp_widget(widget_data: Dict[str, Any]) -> Optional[str]:
@@ -151,165 +239,13 @@ async def process_url_context_widget(widget_data: Dict[str, Any]) -> Optional[st
 
 
 def process_widget_sync(widget_type: str, widget_data: Dict[str, Any]) -> Optional[str]:
-    """Synchronous wrapper for widget processing.
-
-    Args:
-        widget_type: Type of widget to process
-        widget_data: Widget configuration data
-
-    Returns:
-        Processed widget context or None if failed
-    """
-    if widget_type == "notion":
-        # Validate configuration first
-        if not validate_widget_config(widget_type, widget_data):
-            return None
-
-        try:
-            # Check if we're already in an event loop
-            try:
-                asyncio.get_running_loop()
-                # If we're in a loop, we can't create a new one
-                logger.warning(
-                    "Cannot process Notion widget in sync mode while in async context"
-                )
-                return None
-            except RuntimeError:
-                # No running loop, we can create one
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(process_notion_widget(widget_data))
-                finally:
-                    loop.close()
-        except Exception as e:
-            logger.error(f"Error in sync widget processing: {e}")
-            return None
-
-    if widget_type == "mcp":
-        # Validate configuration first
-        if not validate_widget_config(widget_type, widget_data):
-            return None
-
-        try:
-            # Check if we're already in an event loop
-            try:
-                asyncio.get_running_loop()
-                logger.warning(
-                    "Cannot process MCP widget in sync mode while in async context"
-                )
-                return None
-            except RuntimeError:
-                # No running loop, we can create one
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(process_mcp_widget(widget_data))
-                finally:
-                    loop.close()
-        except Exception as e:
-            logger.error(f"Error in sync MCP widget processing: {e}")
-            return None
-
-    if widget_type == "url_context":
-        if not validate_widget_config(widget_type, widget_data):
-            return None
-        try:
-            try:
-                asyncio.get_running_loop()
-                logger.warning(
-                    "Cannot process url_context in sync mode while in async context"
-                )
-                return None
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    return loop.run_until_complete(
-                        process_url_context_widget(widget_data)
-                    )
-                finally:
-                    loop.close()
-        except Exception as e:
-            logger.error(f"Error in sync url_context: {e}")
-            return None
-
-    if widget_type == "scrape":
-        if not validate_widget_config(widget_type, widget_data):
-            return None
-        try:
-            text, _shot = _scrape_with_selenium_wrapper(widget_data)
-            return text
-        except Exception as e:
-            logger.error("Error in sync scrape: %s", e)
-            return None
-
-    # 他のウィジェットタイプは既存の処理を継続
-    return None
+    return _process_text_sync(widget_type, widget_data)
 
 
 def process_widget_with_media(
     widget_type: str, widget_data: Dict[str, Any]
 ) -> Tuple[Optional[str], List[Tuple[str, bytes]]]:
-    text: Optional[str] = None
-    media: List[Tuple[str, bytes]] = []
-    if widget_type == "notion":
-        if not validate_widget_config(widget_type, widget_data):
-            return None, []
-        try:
-            try:
-                asyncio.get_running_loop()
-                logger.warning(
-                    "Cannot process Notion widget in sync mode while in async context"
-                )
-                return None, []
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    text = loop.run_until_complete(process_notion_widget(widget_data))
-                finally:
-                    loop.close()
-        except Exception as e:
-            logger.error("Error in sync widget processing: %s", e)
-            return None, []
-        return text, media
-    if widget_type == "url_context":
-        if not validate_widget_config(widget_type, widget_data):
-            return None, []
-        try:
-            try:
-                asyncio.get_running_loop()
-                logger.warning(
-                    "Cannot process url_context in sync mode while in async context"
-                )
-                return None, []
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    text = loop.run_until_complete(
-                        process_url_context_widget(widget_data)
-                    )
-                finally:
-                    loop.close()
-        except Exception as e:
-            logger.error("Error in sync url_context: %s", e)
-            return None, []
-        return text, media
-    if widget_type == "scrape":
-        if not validate_widget_config(widget_type, widget_data):
-            return None, []
-        try:
-            t, shot = _scrape_with_selenium_wrapper(widget_data)
-            text = t
-            if shot:
-                media.append(("image/png", shot))
-        except Exception as e:
-            logger.error("Error in sync scrape: %s", e)
-            return None, []
-        return text, media
-    return None, []
+    return _process_text_media_sync(widget_type, widget_data)
 
 
 async def process_widgets_async(widgets: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -343,12 +279,22 @@ async def process_widgets_async(widgets: List[Dict[str, Any]]) -> Dict[str, str]
             if context:
                 results[widget_id] = context
 
-        if widget_type == "scrape":
+        if widget_type == "x":
             try:
-                text, _shot = _scrape_with_selenium_wrapper(widget_data)
+                text = process_x_widget(widget_data)
                 if text:
                     results[widget_id] = text
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
+                logger.error("Error processing x widget async: %s", e)
+
+        if widget_type == "scrape":
+            try:
+                text, _shot = await asyncio.to_thread(
+                    _scrape_with_selenium_wrapper, widget_data
+                )
+                if text:
+                    results[widget_id] = text
+            except Exception as e:  # noqa: BLE001
                 logger.error("Error processing scrape widget async: %s", e)
 
     return results
@@ -391,6 +337,16 @@ def get_widget_default_config(widget_type: str) -> Dict[str, Any]:
             "server_id": "",
             "tool_name": "",
             "arguments": {},
+        }
+
+    if widget_type == "x":
+        return {
+            # 実運用では URL/ユーザー/スレッドID 等を使う想定。
+            # テストでは raw_posts 入力（ローカル整形）を利用。
+            "url": "",
+            "mode": "thread",  # thread | user
+            "max_posts": 20,
+            "raw_posts": [],  # [{id, text, author, created_at}] for test
         }
 
     return {}
@@ -462,21 +418,80 @@ def validate_widget_config(widget_type: str, widget_data: Dict[str, Any]) -> boo
     if widget_type == "mcp":
         server_id = widget_data.get("server_id", "")
         tool_name = widget_data.get("tool_name", "")
-        
+
         # server_idとtool_nameは必須
         if not isinstance(server_id, str) or not server_id.strip():
             return False
         if not isinstance(tool_name, str) or not tool_name.strip():
             return False
-        
+
         # argumentsは辞書である必要がある
         arguments = widget_data.get("arguments", {})
         if not isinstance(arguments, dict):
             return False
-        
+
         return True
 
+    if widget_type == "x":
+        # raw_posts があればそれだけでOK（ネットワーク不要のテスト用）
+        raw = widget_data.get("raw_posts", [])
+        if isinstance(raw, list) and raw:
+            for it in raw:
+                if not isinstance(it, dict):
+                    return False
+                if not isinstance(it.get("text", ""), str):
+                    return False
+            return True
+        # URL がある場合は形式とドメインを軽く確認
+        url = widget_data.get("url", "")
+        if isinstance(url, str) and url.strip():
+            # Xは is_url_allowed で基本チェック（private/loopback防止）
+            return is_url_allowed(url)
+        # どちらも無ければ無効
+        return False
+
     return True
+
+
+def _format_x_posts(raw_posts: List[Dict[str, Any]], max_posts: int = 50) -> str:
+    lines: List[str] = []
+    cnt = 0
+    for it in raw_posts:
+        if cnt >= max_posts:
+            break
+        text = str(it.get("text", "")).strip()
+        if not text:
+            continue
+        author = str(it.get("author", "")).strip() or "unknown"
+        created = str(it.get("created_at", "")).strip()
+        prefix = f"@{author}"
+        if created:
+            prefix += f" ({created})"
+        lines.append(prefix)
+        # 本文は引用形式に
+        for ln in text.splitlines():
+            ln = ln.strip()
+            if ln:
+                lines.append(f"> {ln}")
+        lines.append("")
+        cnt += 1
+    return "\n".join(lines).strip()
+
+
+def process_x_widget(widget_data: Dict[str, Any]) -> Optional[str]:
+    """Process X widget.
+
+    優先: raw_posts によるローカル整形（テスト用）。
+    それ以外（URLなど）は将来的に対応。現時点では None を返す。
+    """
+    raw = widget_data.get("raw_posts", [])
+    if isinstance(raw, list) and raw:
+        max_posts = int(widget_data.get("max_posts", 20))
+        max_posts = max(1, min(100, max_posts))
+        text = _format_x_posts(raw, max_posts=max_posts)
+        return text or None
+    # TODO: URL/ユーザータイムライン取得などは将来実装
+    return None
 
 
 def _scrape_with_selenium_wrapper(

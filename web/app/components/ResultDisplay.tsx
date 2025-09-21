@@ -4,24 +4,18 @@ import React, { useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Collapsible from './Collapsible'
-import EyecatchGenerator from './EyecatchGenerator'
 
 interface ResultDisplayProps {
 	draft: string
 	resultEditable: boolean
 	showPreview: boolean
 	commitWithGit: boolean
-	eyecatchUrl: string
-	eyecatchTheme: 'light' | 'dark'
 	onDraftChange: (value: string) => void
 	onResultEditableChange: (editable: boolean) => void
 	onShowPreviewChange: (show: boolean) => void
 	onCommitWithGitChange: (commit: boolean) => void
-	onEyecatchThemeChange: (theme: 'light' | 'dark') => void
 	onCopy: () => void
 	onSave: () => void
-	onGenerateEyecatch: () => void
-	onDownloadEyecatchJpeg: () => void
 }
 
 export default function ResultDisplay({
@@ -29,17 +23,12 @@ export default function ResultDisplay({
 	resultEditable,
 	showPreview,
 	commitWithGit,
-	eyecatchUrl,
-	eyecatchTheme,
 	onDraftChange,
 	onResultEditableChange,
 	onShowPreviewChange,
 	onCommitWithGitChange,
-	onEyecatchThemeChange,
 	onCopy,
 	onSave,
-	onGenerateEyecatch,
-	onDownloadEyecatchJpeg,
 }: ResultDisplayProps) {
 	const previewRef = useRef<HTMLDivElement | null>(null)
 	const textRef = useRef<HTMLTextAreaElement | null>(null)
@@ -51,7 +40,9 @@ export default function ResultDisplay({
 					<input
 						type="checkbox"
 						checked={resultEditable}
-						onChange={(e) => onResultEditableChange(e.target.checked)}
+						onChange={(e) =>
+							onResultEditableChange(e.target.checked)
+						}
 					/>
 					<span className="text-xs">編集モード</span>
 				</label>
@@ -73,7 +64,9 @@ export default function ResultDisplay({
 					<input
 						type="checkbox"
 						checked={commitWithGit}
-						onChange={(e) => onCommitWithGitChange(e.target.checked)}
+						onChange={(e) =>
+							onCommitWithGitChange(e.target.checked)
+						}
 					/>
 					<span className="text-xs">Gitでコミット</span>
 				</label>
@@ -82,19 +75,10 @@ export default function ResultDisplay({
 				</a>
 			</div>
 
-			<EyecatchGenerator
-				eyecatchUrl={eyecatchUrl}
-				eyecatchTheme={eyecatchTheme}
-				draft={draft}
-				onThemeChange={onEyecatchThemeChange}
-				onGenerate={onGenerateEyecatch}
-				onDownloadJpeg={onDownloadEyecatchJpeg}
-			/>
+			{/* Eyecatch 機能は一時的にオミット */}
 
 			{showPreview && (
-				<div
-					ref={previewRef}
-					className="result-preview">
+				<div ref={previewRef} className="result-preview">
 					<ReactMarkdown remarkPlugins={[remarkGfm]}>
 						{draft || ''}
 					</ReactMarkdown>

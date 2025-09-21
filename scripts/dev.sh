@@ -57,6 +57,17 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
+# Node バージョン確認（Next.js 14 は Node 18/20 を推奨。22 は既知の不具合あり）
+if command -v node >/dev/null 2>&1; then
+  NODE_VER=$(node -v 2>/dev/null | sed 's/^v//')
+  NODE_MAJOR=${NODE_VER%%.*}
+  if [[ ${NODE_MAJOR:-0} -ge 21 ]]; then
+    echo "[dev] 注意: 現在の Node は v$NODE_VER です。Next.js 14 の dev 実行は Node 18/20 を推奨します。" >&2
+    echo "[dev] Node 22 で dev サーバが webpack ランタイムの欠損モジュールで落ちる既知事象があります。" >&2
+    echo "[dev] Node 20 LTS に切り替えて再実行してください（nvm/volta など）。" >&2
+  fi
+fi
+
 # Python 依存の同期（ロックファイルがある場合は凍結）
 if [[ -f "$ROOT_DIR/uv.lock" ]]; then
   echo "[dev] uv sync --frozen"
@@ -90,7 +101,15 @@ cleanup() {
 trap cleanup INT TERM EXIT
 
 echo "[dev] API -> http://$API_HOST:$API_PORT"
-uv run fastapi run app/main.py --host "$API_HOST" --port "$API_PORT" --reload &
+# Python ファイルのみ監視し、web 配下の変更では再起動しない
+# fastapi CLI は --reload-dir 等を受け付けないため uvicorn を直接使用
+uv run uvicorn app.main:app \
+  --host "$API_HOST" \
+  --port "$API_PORT" \
+  --reload \
+  --reload-dir app \
+  --reload-include '*.py' \
+  --reload-exclude 'web/**' &
 API_PID=$!
 
 if [[ -d "$ROOT_DIR/web" ]]; then

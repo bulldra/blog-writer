@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 export type Widget = { id: string; name: string; description: string }
@@ -13,7 +12,7 @@ export type ArticleTemplate = {
 	description?: string
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000'
 
 export default function TemplatesPage() {
 	const [list, setList] = useState<ArticleTemplate[]>([])
@@ -62,65 +61,73 @@ export default function TemplatesPage() {
 			const vb = String(b[sortKey] || '').toLowerCase()
 			if (va < vb) return -1 * dir
 			if (va > vb) return 1 * dir
-			// tie-breaker
-			if (a.type < b.type) return -1
-			if (a.type > b.type) return 1
 			return 0
 		})
 		return arr
 	}, [list, q, sortKey, sortOrder])
 
+	const createNew = async () => {
+		try {
+			const id = window
+				.prompt('新規テンプレートID（英数・_・-）', '')
+				?.trim()
+			if (!id) return
+			const re = /^[a-z0-9_\-]+$/
+			if (!re.test(id)) {
+				alert('IDは英数・_・- のみ使用できます')
+				return
+			}
+			if (list.some((x) => x.type === id)) {
+				alert('同じIDのテンプレートが既に存在します')
+				return
+			}
+			const name =
+				window
+					.prompt('表示名（任意。未入力ならIDを使用）', '')
+					?.trim() || id
+			const res = await fetch(
+				`${API_BASE}/api/article-templates/${encodeURIComponent(id)}`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						name,
+						description: '',
+						fields: [],
+						prompt_template: '',
+						widgets: [],
+					}),
+				}
+			)
+			if (!res.ok) {
+				let msg = ''
+				try {
+					const j = await res.json()
+					msg = j?.detail || ''
+				} catch {}
+				alert(msg || '新規作成に失敗しました')
+				return
+			}
+			const created = (await res.json()) as ArticleTemplate
+			setList((prev) =>
+				prev.some((x) => x.type === created.type)
+					? prev
+					: [...prev, created]
+			)
+			router.push(`/templates/${encodeURIComponent(created.type)}`)
+		} catch {}
+	}
+
 	return (
-		<div style={{ maxWidth: 980, margin: '2rem auto', padding: '0 1rem' }}>
-			<h1>記事テンプレート一覧</h1>
+		<div style={{ maxWidth: 1000, margin: '2rem auto', padding: '0 1rem' }}>
 			<div
 				style={{
 					display: 'flex',
-					justifyContent: 'space-between',
+					gap: 8,
 					alignItems: 'center',
-					gap: 12,
-					marginTop: 12,
-					flexWrap: 'wrap',
+					justifyContent: 'space-between',
 				}}>
-				<button
-					onClick={() => {
-						const id = window.prompt(
-							'新しいテンプレートID（英数・_・-）',
-							''
-						)
-						if (!id) return
-						fetch(
-							`${API_BASE}/api/article-templates/${encodeURIComponent(
-								id
-							)}`,
-							{
-								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({
-									name: id,
-									fields: [],
-									prompt_template: '',
-									widgets: [],
-								}),
-							}
-						)
-							.then((r) => r.ok && r.json())
-							.then((row) => {
-								if (!row) return
-								setList((prev) => {
-									const found = prev.find(
-										(x) => x.type === row.type
-									)
-									return found ? prev : [...prev, row]
-								})
-								router.push(
-									`/templates/${encodeURIComponent(row.type)}`
-								)
-							})
-							.catch(() => {})
-					}}>
-					+ 新規作成
-				</button>
+				<h1 style={{ margin: 0 }}>テンプレート一覧</h1>
 				<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
 					<input
 						placeholder="検索 (type/name/description/widgets)"
@@ -146,6 +153,7 @@ export default function TemplatesPage() {
 						title="昇順/降順切替">
 						{sortOrder === 'asc' ? '昇順' : '降順'}
 					</button>
+					<button onClick={createNew}>+ 新規作成</button>
 				</div>
 			</div>
 			<div style={{ marginTop: 12 }}>
@@ -196,7 +204,17 @@ export default function TemplatesPage() {
 					</thead>
 					<tbody>
 						{view.map((tpl) => (
-							<tr key={tpl.type}>
+							<tr
+								key={tpl.type}
+								onClick={() =>
+									router.push(
+										`/templates/${encodeURIComponent(
+											tpl.type
+										)}`
+									)
+								}
+								className="table-row"
+								style={{ cursor: 'pointer' }}>
 								<td
 									style={{
 										padding: 8,
@@ -215,27 +233,15 @@ export default function TemplatesPage() {
 									style={{
 										padding: 8,
 										borderBottom: '1px solid #eee',
+										overflow: 'hidden',
+										textOverflow: 'ellipsis',
+										whiteSpace: 'nowrap',
+										maxWidth: 0,
 									}}>
 									{tpl.description ? (
-										<details>
-											<summary
-												style={{ cursor: 'pointer' }}>
-												{tpl.description.length > 40
-													? tpl.description.slice(
-															0,
-															40
-													  ) + '…'
-													: tpl.description}
-											</summary>
-											<div
-												style={{
-													whiteSpace: 'pre-wrap',
-													color: '#555',
-													marginTop: 4,
-												}}>
-												{tpl.description}
-											</div>
-										</details>
+										<span title={tpl.description}>
+											{tpl.description}
+										</span>
 									) : (
 										<span style={{ color: '#999' }}>—</span>
 									)}
@@ -275,66 +281,12 @@ export default function TemplatesPage() {
 										padding: 8,
 										borderBottom: '1px solid #eee',
 									}}>
-									<Link
-										href={`/templates/${encodeURIComponent(
-											tpl.type
-										)}`}>
-										編集
-									</Link>
-									<button
-										onClick={() => {
-											const newType = window.prompt(
-												'複製先のテンプレートID（英数・_・-）',
-												`${tpl.type}-copy`
-											)
-											if (!newType) return
-											fetch(
-												`${API_BASE}/api/article-templates/${encodeURIComponent(
-													tpl.type
-												)}/duplicate`,
-												{
-													method: 'POST',
-													headers: {
-														'Content-Type':
-															'application/json',
-													},
-													body: JSON.stringify({
-														new_type: newType,
-													}),
-												}
-											)
-												.then((r) =>
-													r.ok ? r.json() : null
-												)
-												.then((row) => {
-													if (!row) return
-													setList((prev) => {
-														const exists =
-															prev.some(
-																(x) =>
-																	x.type ===
-																	row.type
-															)
-														return exists
-															? prev
-															: [...prev, row]
-													})
-													router.push(
-														`/templates/${encodeURIComponent(
-															row.type
-														)}`
-													)
-												})
-												.catch(() => {})
-										}}
-										style={{ marginLeft: 12 }}>
-										複製
-									</button>
 									{['url', 'note', 'review'].includes(
 										tpl.type
 									) ? null : (
 										<button
-											onClick={() => {
+											onClick={(e) => {
+												e.stopPropagation()
 												if (
 													!confirm(
 														`${tpl.type} を削除しますか？`
@@ -371,10 +323,10 @@ export default function TemplatesPage() {
 								</td>
 							</tr>
 						))}
-						{list.length === 0 && (
+						{view.length === 0 && (
 							<tr>
 								<td
-									colSpan={4}
+									colSpan={5}
 									style={{ padding: 8, color: '#666' }}>
 									テンプレートが見つかりません
 								</td>

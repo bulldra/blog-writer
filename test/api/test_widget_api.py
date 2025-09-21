@@ -20,12 +20,12 @@ def test_get_available_widgets_api():
 
     widget_ids = [w["id"] for w in widgets]
     assert set(widget_ids) == {
-        "properties",
         "url_context",
         "kindle",
         "past_posts",
         "epub",
         "notion",
+        "x",
         "scrape",
     }
 

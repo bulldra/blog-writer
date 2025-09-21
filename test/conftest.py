@@ -96,3 +96,77 @@ def _patch_llm_calls(monkeypatch):
     monkeypatch.setattr(
         "app.storage.get_ai_settings", _fake_get_ai_settings, raising=True
     )
+
+
+# すべての外部ネットワークを遮断（テストは ASGI 内で完結するため安全）
+@pytest.fixture(autouse=True)
+def _block_network(monkeypatch):
+    import socket as _socket
+
+    real_socket = _socket.socket
+
+    class _ForbiddenSocket(_socket.socket):
+        def connect(self, address):
+            raise RuntimeError("Network disabled in tests")
+
+        def connect_ex(self, address):
+            raise RuntimeError("Network disabled in tests")
+
+    monkeypatch.setattr(_socket, "socket", _ForbiddenSocket, raising=True)
+    yield
+    monkeypatch.setattr(_socket, "socket", real_socket, raising=True)
+
+
+# 外部SDK/HTTPクライアントをスタブ化（誤って呼んでもネットワークに出ない）
+@pytest.fixture(autouse=True)
+def _patch_external_sdks(monkeypatch):
+    # google-genai クライアントは常にスタブ応答
+    class _DummyGenAIClient:
+        class _Models:
+            def generate_content(self, model=None, contents=None, config=None):
+                class _Resp:
+                    text = "[stub-genai]"
+
+                return _Resp()
+
+        def __init__(self, *args, **kwargs):
+            self.models = self._Models()
+
+    try:
+        monkeypatch.setattr("google.genai.Client", _DummyGenAIClient, raising=True)
+    except Exception:
+        pass
+
+    # httpx.AsyncClient はネットワーク使用時に即例外
+    class _NoNetworkAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):  # pragma: no cover
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):  # pragma: no cover
+            return False
+
+        async def get(self, *args, **kwargs):  # pragma: no cover
+            raise RuntimeError("Network disabled in tests")
+
+        async def post(self, *args, **kwargs):  # pragma: no cover
+            raise RuntimeError("Network disabled in tests")
+
+        def stream(self, *args, **kwargs):  # pragma: no cover
+            class _Ctx:
+                async def __aenter__(self_inner):
+                    raise RuntimeError("Network disabled in tests")
+
+                async def __aexit__(self_inner, exc_type, exc, tb):
+                    return False
+
+            return _Ctx()
+
+    try:
+        import httpx as _httpx
+
+        monkeypatch.setattr(_httpx, "AsyncClient", _NoNetworkAsyncClient, raising=True)
+    except Exception:
+        pass

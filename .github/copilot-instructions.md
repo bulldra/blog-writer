@@ -29,7 +29,10 @@
 -   UI は基本的にコンポーネント化する
 -   コードを修正したらサーバーの再起動を実施
 -   jsx ファイルは Prettier でフォーマットすること
--   スタイルは css に分離
+-   スタイルは css に分離すること
+-   API エンドポイントは RESTful に設計すること
+-   API エンドポイントは `/api/` で始めること
+-   API エンドポイントは可能な限り CRUD 操作に対応すること
 -   コンポーネント化を推進し、共通化できる部分は共通化すること
 -   デザインシステムを意識して、UI コンポーネントの再利用性を高めること
 
@@ -80,3 +83,7 @@
 7. 統合テストよりも単体テストを優先
 8. テストの実行速度を重視
 9. テストコードも本番コードと同じ品質基準を適用
+
+## テスト方針メモ（LLM 抑止）
+
+-   pytest は外部 LLM/ネットワークに到達しないことを厳守 - `test/conftest.py` の autouse フィクスチャで以下を実施 - `app.ai_utils.call_ai` / `call_ai_stream` をスタブ - `app.routers.ai.call_ai` / `call_ai_stream` をスタブ（早期経路） - `app.storage.get_ai_settings` をスタブ（常に API キー空） - ソケットレベルで外部通信を遮断（`socket.socket.connect/connect_ex`） - `google.genai.Client` をスタブ（`models.generate_content` は固定文字列） - `httpx.AsyncClient` をスタブ（get/post/stream で即例外） - これによりテスト中にネットワークへ出る経路は強制的に失敗 → 回帰検出可能

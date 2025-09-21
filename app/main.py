@@ -10,6 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.routers import ai, auth, drafts
 from app.routers import article_templates as article_templates_router
 from app.routers import epub as epub_router
+from app.routers import fs as fs_router
 from app.routers import generation_history as generation_history_router
 from app.routers import images as images_router
 from app.routers import mcp as mcp_router
@@ -17,6 +18,7 @@ from app.routers import migrations as migrations_router
 from app.routers import notion as notion_router
 from app.routers import obsidian as obsidian_router
 from app.routers import templates as templates_router
+from app.routers import widgets as widgets_router
 from app.routers import writing_styles as writing_styles_router
 from app.storage import init_storage
 
@@ -75,7 +77,12 @@ def create_app() -> FastAPI:
     # CORS: フロントエンド(Next.js)のDevサーバ用
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=[
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://0.0.0.0:3000",
+            "http://[::1]:3000",
+        ],
         allow_methods=["*"],
         allow_headers=["*"],
         allow_credentials=True,
@@ -95,6 +102,7 @@ def create_app() -> FastAPI:
         migrations_router.router, prefix="/api/migrate", tags=["migrations"]
     )
     app.include_router(images_router.router, prefix="/api/images", tags=["images"])
+    app.include_router(fs_router.router, prefix="/api/fs", tags=["fs"])
     app.include_router(
         article_templates_router.router,
         prefix="/api/article-templates",
@@ -119,6 +127,11 @@ def create_app() -> FastAPI:
         writing_styles_router.router,
         prefix="/api/writing-styles",
         tags=["writing-styles"],
+    )
+    app.include_router(
+        widgets_router.router,
+        prefix="/api/widgets",
+        tags=["widgets"],
     )
 
     @app.get("/api/health")

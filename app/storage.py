@@ -11,6 +11,7 @@ DATA_DIR = Path(os.getenv("BLOGWRITER_DATA_DIR", "./data")).resolve()
 SETTINGS_FILE = DATA_DIR / "settings.json"
 DRAFTS_FILE = DATA_DIR / "drafts.json"
 GENERATION_HISTORY_FILE = DATA_DIR / "generation_history.json"
+TEMPLATE_VERSIONS_FILE = DATA_DIR / "template_versions.json"
 WRITING_STYLES_FILE = DATA_DIR / "writing_styles.json"
 POSTS_DIR = DATA_DIR / "posts"
 EPUB_CACHE_DIR = DATA_DIR / "epub_cache"
@@ -43,12 +44,13 @@ def _atomic_write(path: Path, data: Any) -> None:
 def init_storage() -> None:
     # 環境変数の変更を反映してパスを再解決
     global DATA_DIR, SETTINGS_FILE, DRAFTS_FILE, GENERATION_HISTORY_FILE
-    global WRITING_STYLES_FILE, POSTS_DIR, EPUB_CACHE_DIR
+    global WRITING_STYLES_FILE, POSTS_DIR, EPUB_CACHE_DIR, TEMPLATE_VERSIONS_FILE
     DATA_DIR = Path(os.getenv("BLOGWRITER_DATA_DIR", "./data")).resolve()
     SETTINGS_FILE = DATA_DIR / "settings.json"
     DRAFTS_FILE = DATA_DIR / "drafts.json"
     GENERATION_HISTORY_FILE = DATA_DIR / "generation_history.json"
     WRITING_STYLES_FILE = DATA_DIR / "writing_styles.json"
+    TEMPLATE_VERSIONS_FILE = DATA_DIR / "template_versions.json"
     POSTS_DIR = DATA_DIR / "posts"
     EPUB_CACHE_DIR = DATA_DIR / "epub_cache"
 
@@ -70,6 +72,8 @@ def init_storage() -> None:
             _atomic_write(GENERATION_HISTORY_FILE, {"next_id": 1, "items": []})
         if not WRITING_STYLES_FILE.exists():
             _atomic_write(WRITING_STYLES_FILE, {"items": {}})
+        if not TEMPLATE_VERSIONS_FILE.exists():
+            _atomic_write(TEMPLATE_VERSIONS_FILE, {"next_id": 1, "items": {}})
     POSTS_DIR.mkdir(parents=True, exist_ok=True)
     EPUB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -423,14 +427,10 @@ def cleanup_prompt_templates() -> int:
 
 # ===== Article Templates (persist into settings.json) =====
 _BUILTIN_ARTICLE_TYPES = {"url", "note", "review"}
+_ALLOWED_TEMPLATE_MODES = {"plan", "ideate", "execute", "organize", "learn"}
 
 # ウィジェットタイプの定義
 WIDGET_TYPES = {
-    "properties": {
-        "id": "properties",
-        "name": "プロパティセット",
-        "description": "記事のメタ情報や入力項目をまとめて扱うためのウィジェット",
-    },
     "url_context": {
         "id": "url_context",
         "name": "URL コンテキスト",
@@ -451,15 +451,15 @@ WIDGET_TYPES = {
         "name": "EPUB書籍検索",
         "description": "EPUBファイルからベクトル検索でRAG機能を提供し、書籍内容を記事作成の参考にします",
     },
+    "x": {
+        "id": "x",
+        "name": "X (旧Twitter)",
+        "description": "Xのポストやスレッドを取り込み、記事作成の参考にします（将来の拡張用）",
+    },
     "scrape": {
         "id": "scrape",
         "name": "スクレイピング",
         "description": "Selenium + ChromeDriver でページ本文やスクリーンショットを収集します",
-    },
-    "mcp": {
-        "id": "mcp",
-        "name": "MCP クライアント",
-        "description": "Model Context Protocol (MCP) サーバーから情報を取得し、記事作成の参考にします",
     },
 }
 
@@ -472,6 +472,7 @@ def _default_article_templates() -> Dict[str, Any]:
             "type": "url",
             "name": "URL コンテキスト",
             "description": "URL の内容をもとに記事化するためのテンプレート",
+            "mode": "plan",
             "fields": [
                 {"key": "goal", "label": "目的", "input_type": "text"},
                 {"key": "audience", "label": "読者", "input_type": "text"},
@@ -485,6 +486,7 @@ def _default_article_templates() -> Dict[str, Any]:
             "type": "note",
             "name": "雑記",
             "description": "自由記述向けのテンプレート",
+            "mode": "ideate",
             "fields": [
                 {"key": "theme", "label": "テーマ", "input_type": "text"},
                 {"key": "goal", "label": "目的", "input_type": "text"},
@@ -498,6 +500,7 @@ def _default_article_templates() -> Dict[str, Any]:
             "type": "review",
             "name": "書評",
             "description": "書籍の所感やおすすめポイントをまとめるテンプレート",
+            "mode": "learn",
             "fields": [
                 {"key": "book_title", "label": "書籍タイトル", "input_type": "text"},
                 {"key": "book_author", "label": "著者", "input_type": "text"},
@@ -538,6 +541,162 @@ def _read_article_templates() -> Dict[str, Any]:
     return merged
 
 
+# ===== Article Template Versions (history snapshots) =====
+def _read_template_versions() -> Dict[str, Any]:
+    raw = _read_json(TEMPLATE_VERSIONS_FILE, {"next_id": 1, "items": {}})
+    data: Dict[str, Any]
+    if isinstance(raw, dict):
+        # dict をコピーして以降は Dict[str, Any] として扱う
+        data = dict(raw)
+    else:
+        data = {"next_id": 1, "items": {}}
+    if not isinstance(data.get("items"), dict):
+        data["items"] = {}
+    if not isinstance(data.get("next_id"), int):
+        data["next_id"] = 1
+    return data
+
+
+def list_template_versions(t: str) -> List[Dict[str, Any]]:
+    """テンプレート t のバージョン一覧を取得
+
+    戻り値: [{version:int, created_at:str} ...] 昇順
+    """
+    with _lock:
+        data = _read_template_versions()
+        items = data.get("items", {})
+        arr = items.get(t, [])
+        if not isinstance(arr, list):
+            return []
+        result: List[Dict[str, Any]] = []
+        for it in arr:
+            try:
+                result.append(
+                    {
+                        "version": int(it.get("version", 0)),
+                        "created_at": str(it.get("created_at", _now_iso())),
+                    }
+                )
+            except Exception:
+                continue
+        result.sort(key=lambda x: x["version"])  # 昇順
+        return result
+
+
+def get_template_version_snapshot(t: str, version: int) -> Optional[Dict[str, Any]]:
+    """指定バージョンのスナップショットを取得
+
+    戻り値: {version, created_at, data: {...template...}}
+    見つからなければ None
+    """
+    with _lock:
+        data = _read_template_versions()
+        arr = data.get("items", {}).get(t, [])
+        if not isinstance(arr, list):
+            return None
+        for it in arr:
+            try:
+                if int(it.get("version")) == int(version):
+                    # data は dict を保証
+                    d = it.get("data")
+                    if not isinstance(d, dict):
+                        return None
+                    return {
+                        "version": int(it.get("version", 0)),
+                        "created_at": str(it.get("created_at", _now_iso())),
+                        "data": d,
+                    }
+            except Exception:
+                continue
+        return None
+
+
+def _template_canonical(obj: Dict[str, Any]) -> Dict[str, Any]:
+    """比較用に正規化。順序や空値の違いで無駄に差分が出ないようにする"""
+    data: Dict[str, Any] = {
+        "type": str(obj.get("type", "")),
+        "name": str(obj.get("name", "")),
+        "description": str(obj.get("description", "")),
+        "mode": str(obj.get("mode", "plan")),
+        "prompt_template": str(obj.get("prompt_template", "")),
+        "widgets": [str(w) for w in obj.get("widgets", [])],
+        "fields": [],
+    }
+    # fields 正規化
+    f_raw = obj.get("fields", [])
+    if isinstance(f_raw, list):
+        for f in f_raw:
+            if not isinstance(f, dict):
+                continue
+            row: Dict[str, Any] = {
+                "key": str(f.get("key", "")),
+                "label": str(f.get("label", "")),
+                "input_type": str(f.get("input_type", "text")),
+            }
+            if row["input_type"] == "select":
+                opts = f.get("options", [])
+                if isinstance(opts, list):
+                    row["options"] = [str(o) for o in opts]
+            data["fields"].append(row)
+    # スタイルは任意
+    if "style_id" in obj and obj.get("style_id") is not None:
+        data["style_id"] = str(obj.get("style_id", ""))
+    # 並び安定化
+    data["widgets"] = sorted(set(data["widgets"]))
+    data["fields"] = sorted(data["fields"], key=lambda x: x.get("key", ""))
+    return data
+
+
+def _snapshot_needed(prev: Optional[Dict[str, Any]], cur: Dict[str, Any]) -> bool:
+    if prev is None:
+        return True
+    return _template_canonical(prev) != _template_canonical(cur)
+
+
+def _append_template_snapshot_locked(t: str, tpl: Dict[str, Any]) -> None:
+    data = _read_template_versions()
+    items = data.get("items", {})
+    arr = list(items.get(t, []))
+    last = arr[-1] if arr else None
+    prev_data = last.get("data") if isinstance(last, dict) else None
+    if not _snapshot_needed(prev_data if isinstance(prev_data, dict) else None, tpl):
+        return
+    version = int(data.get("next_id", 1))
+    now = _now_iso()
+    arr.append({"version": version, "created_at": now, "data": tpl})
+    data["next_id"] = version + 1
+    items[t] = arr
+    data["items"] = items
+    _atomic_write(TEMPLATE_VERSIONS_FILE, data)
+
+
+def diff_template_versions(
+    t: str, from_version: int, to_version: int
+) -> Dict[str, Any]:
+    """2つのバージョン間の差分を返す。
+
+    戻り値: {changed_keys: List[str], diff: Dict[str, {from:Any, to:Any}]}
+    """
+    a = get_template_version_snapshot(t, from_version)
+    b = get_template_version_snapshot(t, to_version)
+    if not a or not b:
+        return {"changed_keys": [], "diff": {}}
+    data_a = a.get("data")
+    data_b = b.get("data")
+    if not isinstance(data_a, dict) or not isinstance(data_b, dict):
+        return {"changed_keys": [], "diff": {}}
+    ca = _template_canonical(data_a)
+    cb = _template_canonical(data_b)
+    keys = sorted(set(ca.keys()) | set(cb.keys()))
+    changed: List[str] = []
+    diff: Dict[str, Any] = {}
+    for k in keys:
+        if ca.get(k) != cb.get(k):
+            changed.append(k)
+            diff[k] = {"from": ca.get(k), "to": cb.get(k)}
+    return {"changed_keys": changed, "diff": diff}
+
+
 def list_article_templates() -> List[Dict[str, Any]]:
     with _lock:
         merged = _read_article_templates()
@@ -555,6 +714,12 @@ def list_article_templates() -> List[Dict[str, Any]]:
                     r["widgets"] = [str(w) for w in ws if str(w) in _ALLOWED_WIDGETS]
                 else:
                     r["widgets"] = []
+                # mode 正規化
+                m = str(r.get("mode", "")).strip().lower()
+                r["mode"] = m if m in _ALLOWED_TEMPLATE_MODES else "plan"
+                # style_id は任意文字列として返却（後方互換のため存在時のみ）
+                if "style_id" in r and r["style_id"] is not None:
+                    r["style_id"] = str(r["style_id"]) or ""
                 rows.append(r)
         # built-in を優先的に先頭に
         rows.sort(key=lambda x: (x["type"] not in ("url", "note", "review"), x["type"]))
@@ -575,6 +740,12 @@ def get_article_template(t: str) -> Optional[Dict[str, Any]]:
             r["widgets"] = [str(w) for w in ws if str(w) in _ALLOWED_WIDGETS]
         else:
             r["widgets"] = []
+        # mode 正規化
+        m = str(r.get("mode", "")).strip().lower()
+        r["mode"] = m if m in _ALLOWED_TEMPLATE_MODES else "plan"
+        # style_id は任意文字列として返却（後方互換のため存在時のみ）
+        if "style_id" in r and r["style_id"] is not None:
+            r["style_id"] = str(r["style_id"]) or ""
         return r
 
 
@@ -628,6 +799,11 @@ def save_article_template(t: str, payload: Dict[str, Any]) -> Optional[Dict[str,
         norm_fields.append(field_row)
     prompt_template = str(payload.get("prompt_template", ""))
     description = str(payload.get("description", ""))
+    raw_mode = str(payload.get("mode", "")).strip().lower()
+    mode = raw_mode if raw_mode in _ALLOWED_TEMPLATE_MODES else "plan"
+    style_id = payload.get("style_id")
+    if style_id is not None:
+        style_id = str(style_id).strip()
     widgets_raw = payload.get("widgets", [])
     widgets: List[str] = []
     if isinstance(widgets_raw, list):
@@ -648,13 +824,18 @@ def save_article_template(t: str, payload: Dict[str, Any]) -> Optional[Dict[str,
             "type": t,
             "name": name,
             "description": description,
+            "mode": mode,
             "fields": norm_fields,
             "prompt_template": prompt_template,
             "widgets": widgets,
         }
+        if style_id:
+            row["style_id"] = style_id
         items[t] = row
         data["article_templates"] = items
         _atomic_write(SETTINGS_FILE, data)
+        # バージョン履歴にスナップショットを保存（重複は抑制）
+        _append_template_snapshot_locked(t, row)
         return row
 
 
@@ -910,12 +1091,12 @@ def save_mcp_settings(servers: Dict[str, Any], enabled: bool = False) -> None:
     """MCP設定を保存する"""
     with _lock:
         data = _read_json(SETTINGS_FILE, {})
-        
+
         mcp_config = {
             "servers": dict(servers),
             "enabled": bool(enabled),
         }
-        
+
         data["mcp"] = mcp_config
         _atomic_write(SETTINGS_FILE, data)
 
@@ -933,12 +1114,12 @@ def add_mcp_server(
         args = []
     if env is None:
         env = {}
-    
+
     with _lock:
         data = _read_json(SETTINGS_FILE, {})
         mcp_config = data.get("mcp", {})
         servers = dict(mcp_config.get("servers", {}))
-        
+
         servers[server_id] = {
             "name": str(name),
             "command": str(command),
@@ -946,12 +1127,12 @@ def add_mcp_server(
             "env": dict(env),
             "enabled": bool(enabled),
         }
-        
+
         mcp_config = {
             "servers": servers,
             "enabled": bool(mcp_config.get("enabled", False)),
         }
-        
+
         data["mcp"] = mcp_config
         _atomic_write(SETTINGS_FILE, data)
 
@@ -962,17 +1143,17 @@ def remove_mcp_server(server_id: str) -> bool:
         data = _read_json(SETTINGS_FILE, {})
         mcp_config = data.get("mcp", {})
         servers = dict(mcp_config.get("servers", {}))
-        
+
         if server_id not in servers:
             return False
-        
+
         del servers[server_id]
-        
+
         mcp_config = {
             "servers": servers,
             "enabled": bool(mcp_config.get("enabled", False)),
         }
-        
+
         data["mcp"] = mcp_config
         _atomic_write(SETTINGS_FILE, data)
         return True

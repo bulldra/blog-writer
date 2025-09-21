@@ -4,10 +4,13 @@ from fastapi import APIRouter, HTTPException
 
 from app.storage import (
     delete_article_template,
+    diff_template_versions,
     duplicate_article_template,
     get_article_template,
     get_available_widgets,
+    get_template_version_snapshot,
     list_article_templates,
+    list_template_versions,
     save_article_template,
 )
 
@@ -74,3 +77,21 @@ def get_available_widget_types():
             }
         )
     return {"widgets": widgets}
+
+
+@router.get("/{t}/versions")
+def versions(t: str):
+    return list_template_versions(t)
+
+
+@router.get("/{t}/versions/{version}")
+def version_snapshot(t: str, version: int):
+    snap = get_template_version_snapshot(t, version)
+    if not snap:
+        raise HTTPException(status_code=404, detail="not found")
+    return snap
+
+
+@router.get("/{t}/diff")
+def version_diff(t: str, from_version: int, to_version: int):
+    return diff_template_versions(t, from_version, to_version)

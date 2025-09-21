@@ -11,7 +11,7 @@ import GenerationControls from './components/GenerationControls'
 import ResultDisplay from './components/ResultDisplay'
 import TodoSection from './components/TodoSection'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000'
 
 type TemplateField = {
 	key: string
@@ -69,11 +69,7 @@ export default function Page() {
 	const sawOutputMarkerRef = useRef(false)
 	const reasoningRef = useRef<HTMLDivElement | null>(null)
 
-	// 画像
-	const [eyecatchUrl, setEyecatchUrl] = useState('')
-	const [eyecatchTheme, setEyecatchTheme] = useState<'light' | 'dark'>(
-		'light'
-	)
+	// 画像機能は一時停止中（UI から除外）
 
 	// 編集依頼
 	const [editInstruction, setEditInstruction] = useState('')
@@ -498,60 +494,7 @@ export default function Page() {
 		}
 	}
 
-	const generateEyecatch = async () => {
-		try {
-			const titleGuess = (draft.match(/^#\s*(.+)/m)?.[1] || '').trim()
-			const res = await fetch(`${API_BASE}/api/images/eyecatch`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					title: titleGuess || bulletTitle || 'Blog Post',
-					width: 1200,
-					height: 630,
-					theme: eyecatchTheme,
-				}),
-			})
-			if (res.ok) {
-				const json = await res.json()
-				setEyecatchUrl(json.data_url || '')
-			}
-		} catch {}
-	}
-
-	const downloadEyecatchJpeg = async () => {
-		try {
-			if (!eyecatchUrl.startsWith('data:image/svg+xml')) return
-			const svgText = atob(eyecatchUrl.split(',')[1] || '')
-			const svg = new Blob([svgText], { type: 'image/svg+xml' })
-			const url = URL.createObjectURL(svg)
-			const img = new Image()
-			await new Promise<void>((resolve, reject) => {
-				img.onload = () => resolve()
-				img.onerror = () => reject()
-				img.src = url
-			})
-			const canvas = document.createElement('canvas')
-			canvas.width = 1200
-			canvas.height = 630
-			const ctx = canvas.getContext('2d')
-			if (!ctx) return
-			ctx.fillStyle = '#fff'
-			ctx.fillRect(0, 0, canvas.width, canvas.height)
-			ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-			canvas.toBlob(
-				(blob) => {
-					if (!blob) return
-					const a = document.createElement('a')
-					a.href = URL.createObjectURL(blob)
-					a.download =
-						(draft.match(/^#\s*(.+)/m)?.[1] || 'eyecatch') + '.jpg'
-					a.click()
-				},
-				'image/jpeg',
-				0.92
-			)
-		} catch {}
-	}
+	// generateEyecatch / downloadEyecatchJpeg は一時的に無効化
 
 	const requestEdit = async () => {
 		const content = draft.trim()
@@ -651,9 +594,7 @@ export default function Page() {
 						} catch {}
 					}}
 					// scrape 設定の受け渡し
-					// @ts-ignore 既存型を崩さないため一時無視（後で型拡張を検討）
 					scrapeCfg={scrapeCfg}
-					// @ts-ignore
 					onChangeScrapeCfg={(next: Partial<typeof scrapeCfg>) =>
 						setScrapeCfg((prev) => ({ ...prev, ...next }))
 					}
@@ -819,19 +760,14 @@ export default function Page() {
 					resultEditable={resultEditable}
 					showPreview={showPreview}
 					commitWithGit={commitWithGit}
-					eyecatchUrl={eyecatchUrl}
-					eyecatchTheme={eyecatchTheme}
 					onDraftChange={setDraft}
 					onResultEditableChange={setResultEditable}
 					onShowPreviewChange={setShowPreview}
 					onCommitWithGitChange={setCommitWithGit}
-					onEyecatchThemeChange={setEyecatchTheme}
 					onCopy={() => {
 						navigator.clipboard.writeText(draft).catch(() => {})
 					}}
 					onSave={save}
-					onGenerateEyecatch={generateEyecatch}
-					onDownloadEyecatchJpeg={downloadEyecatchJpeg}
 				/>
 
 				{/* 編集を依頼 */}
