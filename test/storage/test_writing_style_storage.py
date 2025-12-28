@@ -26,6 +26,12 @@ def test_writing_style_save_and_retrieve(temp_data_dir):
         },
         "source_text": "元となる文章のサンプルです。",
         "description": "テスト用の文体テンプレートです。",
+        "tone_manner": {
+            "dos": ["親しみやすい表現を使う"],
+            "donts": ["堅苦しい表現は避ける"],
+            "example_phrases": ["〜してみませんか？"],
+            "brand_voice_rules": "親しみやすさを第一に",
+        },
     }
 
     # 保存
@@ -33,6 +39,7 @@ def test_writing_style_save_and_retrieve(temp_data_dir):
     assert saved_style is not None
     assert saved_style["id"] == "test_style"
     assert saved_style["name"] == "テスト文体"
+    assert saved_style["tone_manner"]["dos"] == ["親しみやすい表現を使う"]
 
     # 取得
     retrieved_style = get_writing_style("test_style")
@@ -40,6 +47,7 @@ def test_writing_style_save_and_retrieve(temp_data_dir):
     assert retrieved_style["id"] == "test_style"
     assert retrieved_style["name"] == "テスト文体"
     assert retrieved_style["properties"]["tone"] == "フレンドリー"
+    assert retrieved_style["tone_manner"]["brand_voice_rules"] == "親しみやすさを第一に"
 
 
 def test_writing_style_list_includes_saved(temp_data_dir):
@@ -154,3 +162,68 @@ def test_writing_style_properties_validation(temp_data_dir):
     style = save_writing_style("complete", complete_data)
     assert style is not None
     assert len(style["properties"]) == 5
+
+
+def test_writing_style_tone_manner_empty(temp_data_dir):
+    """トンマナフィールドが空の場合のテスト"""
+    style_data = {
+        "name": "トンマナなし文体",
+        "properties": {"tone": "ニュートラル"},
+        "source_text": "サンプルテキスト",
+        "description": "トンマナなし",
+    }
+
+    saved_style = save_writing_style("no_tone_manner", style_data)
+    assert saved_style is not None
+    assert saved_style["tone_manner"] == {}
+
+
+def test_writing_style_tone_manner_full(temp_data_dir):
+    """トンマナフィールドが完全に設定された場合のテスト"""
+    style_data = {
+        "name": "完全トンマナ文体",
+        "properties": {"tone": "フレンドリー"},
+        "source_text": "サンプルテキスト",
+        "description": "完全なトンマナ設定",
+        "tone_manner": {
+            "dos": ["親しみやすい表現を使う", "簡潔に書く"],
+            "donts": ["専門用語を避ける", "長文は書かない"],
+            "example_phrases": ["〜してみませんか？", "〜してみましょう"],
+            "brand_voice_rules": "親しみやすさと分かりやすさを第一に",
+        },
+    }
+
+    saved_style = save_writing_style("full_tone_manner", style_data)
+    assert saved_style is not None
+    assert len(saved_style["tone_manner"]["dos"]) == 2
+    assert len(saved_style["tone_manner"]["donts"]) == 2
+    assert len(saved_style["tone_manner"]["example_phrases"]) == 2
+    assert "親しみやすさ" in saved_style["tone_manner"]["brand_voice_rules"]
+
+    # 取得して確認
+    retrieved = get_writing_style("full_tone_manner")
+    assert retrieved is not None
+    assert retrieved["tone_manner"]["dos"][0] == "親しみやすい表現を使う"
+    assert (
+        retrieved["tone_manner"]["brand_voice_rules"]
+        == "親しみやすさと分かりやすさを第一に"
+    )
+
+
+def test_writing_style_tone_manner_partial(temp_data_dir):
+    """トンマナフィールドが部分的に設定された場合のテスト"""
+    style_data = {
+        "name": "部分トンマナ文体",
+        "properties": {"tone": "カジュアル"},
+        "source_text": "サンプルテキスト",
+        "description": "部分的なトンマナ設定",
+        "tone_manner": {
+            "dos": ["絵文字を使う"],
+            "brand_voice_rules": "カジュアルに",
+        },
+    }
+
+    saved_style = save_writing_style("partial_tone_manner", style_data)
+    assert saved_style is not None
+    assert len(saved_style["tone_manner"]["dos"]) == 1
+    assert saved_style["tone_manner"]["brand_voice_rules"] == "カジュアルに"

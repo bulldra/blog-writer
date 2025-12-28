@@ -175,3 +175,58 @@ def test_create_writing_style_invalid_data(client, temp_data_dir):
 
     response = client.post("/api/writing-styles/invalid", json=invalid_data)
     assert response.status_code == 400
+
+
+def test_create_writing_style_with_tone_manner(client, temp_data_dir):
+    """トンマナ付き文体テンプレート作成のテスト"""
+    style_data = {
+        "name": "トンマナ付き文体",
+        "properties": {"tone": "フレンドリー"},
+        "source_text": "サンプルテキスト",
+        "description": "トンマナテスト",
+        "tone_manner": {
+            "dos": ["親しみやすく書く", "絵文字を使う"],
+            "donts": ["堅苦しい表現は避ける"],
+            "example_phrases": ["〜してみましょう"],
+            "brand_voice_rules": "親しみやすさを重視",
+        },
+    }
+
+    response = client.post("/api/writing-styles/tone_manner_test", json=style_data)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["id"] == "tone_manner_test"
+    assert data["name"] == "トンマナ付き文体"
+    assert "tone_manner" in data
+    assert len(data["tone_manner"]["dos"]) == 2
+    assert data["tone_manner"]["brand_voice_rules"] == "親しみやすさを重視"
+
+
+def test_get_writing_style_with_tone_manner(client, temp_data_dir):
+    """トンマナ付き文体テンプレート取得のテスト"""
+    # まず作成
+    style_data = {
+        "name": "トンマナ取得テスト",
+        "properties": {"tone": "カジュアル"},
+        "source_text": "サンプル",
+        "description": "取得テスト",
+        "tone_manner": {
+            "dos": ["簡潔に書く"],
+            "donts": ["長文は避ける"],
+            "example_phrases": ["〜ですね"],
+            "brand_voice_rules": "シンプルに",
+        },
+    }
+
+    client.post("/api/writing-styles/get_tone_manner", json=style_data)
+
+    # 取得
+    response = client.get("/api/writing-styles/get_tone_manner")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["id"] == "get_tone_manner"
+    assert "tone_manner" in data
+    assert data["tone_manner"]["dos"] == ["簡潔に書く"]
+    assert data["tone_manner"]["brand_voice_rules"] == "シンプルに"

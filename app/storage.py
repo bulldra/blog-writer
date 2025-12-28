@@ -1230,6 +1230,11 @@ def save_writing_style(style_id: str, style_data: Any) -> Optional[Dict[str, Any
             ),
             "source_text": str(style_data["source_text"]),
             "description": str(style_data["description"]),
+            "tone_manner": (
+                dict(style_data["tone_manner"])
+                if isinstance(style_data.get("tone_manner"), dict)
+                else {}
+            ),
             "created_at": style_data.get("created_at", now_str),
             "updated_at": now_str,
         }
