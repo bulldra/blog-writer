@@ -1,12 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
 
+type ToneManner = {
+  dos?: string[];
+  donts?: string[];
+  example_phrases?: string[];
+  brand_voice_rules?: string;
+};
+
 type WritingStyle = {
   id: string;
   name: string;
   properties: Record<string, string>;
   source_text: string;
   description: string;
+  tone_manner?: ToneManner;
   created_at: string;
   updated_at: string;
 };
@@ -23,9 +31,18 @@ export default function WritingStylesPage() {
     source_text: "",
     description: "",
     properties: {} as Record<string, string>,
+    tone_manner: {
+      dos: [] as string[],
+      donts: [] as string[],
+      example_phrases: [] as string[],
+      brand_voice_rules: "",
+    },
   });
   const [newPropertyKey, setNewPropertyKey] = useState("");
   const [newPropertyValue, setNewPropertyValue] = useState("");
+  const [newDoItem, setNewDoItem] = useState("");
+  const [newDontItem, setNewDontItem] = useState("");
+  const [newExamplePhrase, setNewExamplePhrase] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,6 +68,12 @@ export default function WritingStylesPage() {
         source_text: "",
         description: "",
         properties: {},
+        tone_manner: {
+          dos: [],
+          donts: [],
+          example_phrases: [],
+          brand_voice_rules: "",
+        },
       });
       return;
     }
@@ -64,6 +87,12 @@ export default function WritingStylesPage() {
           source_text: style.source_text,
           description: style.description,
           properties: style.properties || {},
+          tone_manner: style.tone_manner || {
+            dos: [],
+            donts: [],
+            example_phrases: [],
+            brand_voice_rules: "",
+          },
         });
       }
     } catch (e) {
@@ -153,6 +182,12 @@ export default function WritingStylesPage() {
             source_text: "",
             description: "",
             properties: {},
+            tone_manner: {
+              dos: [],
+              donts: [],
+              example_phrases: [],
+              brand_voice_rules: "",
+            },
           });
         }
       }
@@ -189,6 +224,27 @@ export default function WritingStylesPage() {
       delete newProps[key];
       return { ...prev, properties: newProps };
     });
+  };
+
+  const addToneMannerItem = (field: "dos" | "donts" | "example_phrases", value: string) => {
+    if (!value.trim()) return;
+    setFormData((prev) => ({
+      ...prev,
+      tone_manner: {
+        ...prev.tone_manner,
+        [field]: [...(prev.tone_manner[field] || []), value.trim()],
+      },
+    }));
+  };
+
+  const removeToneMannerItem = (field: "dos" | "donts" | "example_phrases", index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      tone_manner: {
+        ...prev.tone_manner,
+        [field]: prev.tone_manner[field]?.filter((_, i) => i !== index) || [],
+      },
+    }));
   };
 
   const startEdit = (id?: string) => {
@@ -413,6 +469,176 @@ export default function WritingStylesPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* トンマナ (Tone & Manner) セクション */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    トンマナ（Tone & Manner）
+                  </label>
+                  
+                  {/* ブランドボイスルール */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      ブランドボイスルール
+                    </label>
+                    <textarea
+                      value={formData.tone_manner.brand_voice_rules}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          tone_manner: {
+                            ...prev.tone_manner,
+                            brand_voice_rules: e.target.value,
+                          },
+                        }))
+                      }
+                      rows={3}
+                      className="w-full p-2 border border-gray-300 rounded text-sm"
+                      placeholder="ブランドのトーンやボイスに関する全体的なルールを記載"
+                    />
+                  </div>
+
+                  {/* すべきこと (Dos) */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      すべきこと (Dos)
+                    </label>
+                    <div className="space-y-1 mb-2">
+                      {formData.tone_manner.dos?.map((item, idx) => (
+                        <div key={idx} className="flex items-center space-x-2 text-sm">
+                          <span className="flex-1 p-2 bg-green-50 border border-green-200 rounded">
+                            ✓ {item}
+                          </span>
+                          <button
+                            onClick={() => removeToneMannerItem("dos", idx)}
+                            className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={newDoItem}
+                        onChange={(e) => setNewDoItem(e.target.value)}
+                        placeholder="例: 親しみやすい言葉遣いを心がける"
+                        className="flex-1 p-2 border border-gray-300 rounded text-sm"
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") {
+                            addToneMannerItem("dos", newDoItem);
+                            setNewDoItem("");
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          addToneMannerItem("dos", newDoItem);
+                          setNewDoItem("");
+                        }}
+                        disabled={!newDoItem.trim()}
+                        className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 text-sm"
+                      >
+                        追加
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* すべきでないこと (Don'ts) */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      すべきでないこと (Don&apos;ts)
+                    </label>
+                    <div className="space-y-1 mb-2">
+                      {formData.tone_manner.donts?.map((item, idx) => (
+                        <div key={idx} className="flex items-center space-x-2 text-sm">
+                          <span className="flex-1 p-2 bg-red-50 border border-red-200 rounded">
+                            ✗ {item}
+                          </span>
+                          <button
+                            onClick={() => removeToneMannerItem("donts", idx)}
+                            className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={newDontItem}
+                        onChange={(e) => setNewDontItem(e.target.value)}
+                        placeholder="例: 専門用語を多用しない"
+                        className="flex-1 p-2 border border-gray-300 rounded text-sm"
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") {
+                            addToneMannerItem("donts", newDontItem);
+                            setNewDontItem("");
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          addToneMannerItem("donts", newDontItem);
+                          setNewDontItem("");
+                        }}
+                        disabled={!newDontItem.trim()}
+                        className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 text-sm"
+                      >
+                        追加
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 例文・フレーズ */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      例文・フレーズ
+                    </label>
+                    <div className="space-y-1 mb-2">
+                      {formData.tone_manner.example_phrases?.map((item, idx) => (
+                        <div key={idx} className="flex items-center space-x-2 text-sm">
+                          <span className="flex-1 p-2 bg-blue-50 border border-blue-200 rounded">
+                            💬 {item}
+                          </span>
+                          <button
+                            onClick={() => removeToneMannerItem("example_phrases", idx)}
+                            className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-xs"
+                          >
+                            削除
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={newExamplePhrase}
+                        onChange={(e) => setNewExamplePhrase(e.target.value)}
+                        placeholder="例: 〜してみませんか？"
+                        className="flex-1 p-2 border border-gray-300 rounded text-sm"
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") {
+                            addToneMannerItem("example_phrases", newExamplePhrase);
+                            setNewExamplePhrase("");
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          addToneMannerItem("example_phrases", newExamplePhrase);
+                          setNewExamplePhrase("");
+                        }}
+                        disabled={!newExamplePhrase.trim()}
+                        className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 text-sm"
+                      >
+                        追加
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           ) : selectedId ? (
@@ -497,6 +723,86 @@ export default function WritingStylesPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* トンマナ表示 */}
+                    {style.tone_manner && (
+                      Object.keys(style.tone_manner).length > 0 &&
+                      (style.tone_manner.brand_voice_rules ||
+                        (style.tone_manner.dos && style.tone_manner.dos.length > 0) ||
+                        (style.tone_manner.donts && style.tone_manner.donts.length > 0) ||
+                        (style.tone_manner.example_phrases && style.tone_manner.example_phrases.length > 0))
+                    ) && (
+                      <div>
+                        <h3 className="font-medium text-gray-700 mb-2">
+                          トンマナ（Tone & Manner）
+                        </h3>
+                        
+                        {style.tone_manner.brand_voice_rules && (
+                          <div className="mb-3">
+                            <h4 className="text-sm font-medium text-gray-600 mb-1">
+                              ブランドボイスルール
+                            </h4>
+                            <div className="p-3 bg-gray-50 rounded border text-sm">
+                              {style.tone_manner.brand_voice_rules}
+                            </div>
+                          </div>
+                        )}
+
+                        {style.tone_manner.dos && style.tone_manner.dos.length > 0 && (
+                          <div className="mb-3">
+                            <h4 className="text-sm font-medium text-gray-600 mb-1">
+                              すべきこと (Dos)
+                            </h4>
+                            <div className="space-y-1">
+                              {style.tone_manner.dos.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-2 bg-green-50 border border-green-200 rounded text-sm"
+                                >
+                                  ✓ {item}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {style.tone_manner.donts && style.tone_manner.donts.length > 0 && (
+                          <div className="mb-3">
+                            <h4 className="text-sm font-medium text-gray-600 mb-1">
+                              すべきでないこと (Don&apos;ts)
+                            </h4>
+                            <div className="space-y-1">
+                              {style.tone_manner.donts.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-2 bg-red-50 border border-red-200 rounded text-sm"
+                                >
+                                  ✗ {item}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {style.tone_manner.example_phrases && style.tone_manner.example_phrases.length > 0 && (
+                          <div className="mb-3">
+                            <h4 className="text-sm font-medium text-gray-600 mb-1">
+                              例文・フレーズ
+                            </h4>
+                            <div className="space-y-1">
+                              {style.tone_manner.example_phrases.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="p-2 bg-blue-50 border border-blue-200 rounded text-sm"
+                                >
+                                  💬 {item}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
                       <div>
